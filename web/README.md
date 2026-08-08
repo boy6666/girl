@@ -8,10 +8,12 @@
 cd E:/college_information/girl
 # 首次需装依赖（已装可跳过）
 pip install -r web/requirements.txt
-python -m uvicorn web.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn web.main:app --host 127.0.0.1 --port 18780
 ```
 
-打开 http://127.0.0.1:8000
+打开 http://127.0.0.1:18780
+
+> **关于端口**：默认 `18780`（落在 OpenClaw 派生端口段内，网关是 `18789`，避开 8000 这类常用占用）。想换就改命令里的 `--port`，或改 `web/main.py` 末尾。Uvicorn 冷门端口 http://127.0.0.1:18780
 
 ## 页面
 
