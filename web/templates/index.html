@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小语 · 伴侣后台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="container">
+    <aside class="sidebar">
+        <div class="logo">💗 小语 · 伴侣后台</div>
+        <nav>
+            <a class="nav-item active" data-page="personality" href="#"><span class="icon">🎚️</span>人格调参</a>
+            <a class="nav-item" data-page="memory" href="#"><span class="icon">🧠</span>记忆</a>
+            <a class="nav-item" data-page="files" href="#"><span class="icon">📄</span>人格文件</a>
+            <a class="nav-item" data-page="behavior" href="#"><span class="icon">🤖</span>行为</a>
+            <a class="nav-item" data-page="status" href="#"><span class="icon">📊</span>状态</a>
+        </nav>
+        <div class="sidebar-note">改动人格：保存后<br>下一条微信消息生效</div>
+    </aside>
+
+    <main class="main-content">
+        <!-- 人格调参 -->
+        <section class="page active" id="page-personality">
+            <h1>人格调参</h1>
+            <p class="description">五维滑块决定小语说话的样子。拖动保存后，渲染器会重写 SOUL.md 的滑块段，你在下一条微信消息里就能感觉到变化。</p>
+            <div class="sliders" id="sliders-wrap"></div>
+            <button class="btn-save" onclick="savePersonality()">保存并应用到小语</button>
+            <div class="preview">
+                <h3>SOUL.md 滑块段预览</h3>
+                <pre id="soul-preview" class="preview-box"></pre>
+            </div>
+        </section>
+
+        <!-- 记忆 -->
+        <section class="page" id="page-memory">
+            <h1>记忆</h1>
+            <p class="description">小语在 OpenClaw 里的会话与对话（girl agent）。她聊过的每一句都在这——这就是她"记得你"的原料。</p>
+            <div class="memory-stats" id="memory-stats"></div>
+            <div class="memory-list" id="memory-list"><p class="loading">加载中…</p></div>
+        </section>
+
+        <!-- 人格文件 -->
+        <section class="page" id="page-files">
+            <h1>人格文件</h1>
+            <p class="description">小语的人格就存在这些文件里（girl_workspace/）。只读展示，编辑请直接改文件或改滑块。</p>
+            <div class="file-tabs" id="file-tabs"></div>
+            <pre class="preview-box" id="file-content" style="min-height:300px;"></pre>
+        </section>
+
+        <!-- 行为 -->
+        <section class="page" id="page-behavior">
+            <h1>行为配置</h1>
+            <p class="description">主动行为参数（V1 定时找话的基础；V1.5 状态机会接管 energy/mood/social_need）。</p>
+            <div class="behavior-grid" id="behavior-grid"></div>
+            <button class="btn-save" onclick="saveBehavior()">保存行为配置</button>
+        </section>
+
+        <!-- 状态 -->
+        <section class="page" id="page-status">
+            <h1>状态</h1>
+            <p class="description">后台视角的小语接线状态。网关/模型深层健康请用命令行 <code>openclaw status</code>。</p>
+            <div class="status-cards" id="status-cards"></div>
+        </section>
+    </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

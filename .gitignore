@@ -21,6 +21,9 @@ data/**/*.db
 girl_workspace/memory/
 girl_workspace/**/memory/
 
+# Web 后台运行态（滑块当前值，不入库）
+web/personality.yaml
+
 # Node / OpenClaw
 node_modules/
 *.openclaw.json
