@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Girlfriend - 控制台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">🤖 AI Girlfriend</div>
+            <nav>
+                <a href="#" class="nav-item active" data-page="chat">
+                    <span class="icon">💬</span> 对话测试
+                </a>
+                <a href="#" class="nav-item" data-page="personality">
+                    <span class="icon">🎭</span> 人格调参
+                </a>
+                <a href="#" class="nav-item" data-page="memory">
+                    <span class="icon">🧠</span> 记忆管理
+                </a>
+                <a href="#" class="nav-item" data-page="status">
+                    <span class="icon">📊</span> 系统状态
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 页面：对话测试 -->
+            <section id="page-chat" class="page active">
+                <h1>💬 对话测试</h1>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" placeholder="输入消息测试...">
+                        <button onclick="sendMessage()">发送</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 页面：人格调参 -->
+            <section id="page-personality" class="page">
+                <h1>🎭 人格调参</h1>
+                <p class="description">调整 AI 女友的性格参数，实时生效</p>
+
+                <div class="sliders">
+                    <div class="slider-group">
+                        <label>
+                            <span>🍬 甜度</span>
+                            <span class="value" id="sweetness-value">65</span>
+                        </label>
+                        <input type="range" id="sweetness" min="0" max="100" value="65"
+                               onchange="updateSlider('sweetness', this.value)">
+                        <div class="slider-labels">
+                            <span>冷淡</span><span>甜蜜</span>
+                        </div>
+                    </div>
+
+                    <div class="slider-group">
+                        <label>
+                            <span>❄️ 高冷度</span>
+                            <span class="value" id="coolness-value">30</span>
+                        </label>
+                        <input type="range" id="coolness" min="0" max="100" value="30"
+                               onchange="updateSlider('coolness', this.value)">
+                        <div class="slider-labels">
+                            <span>热情</span><span>高冷</span>
+                        </div>
+                    </div>
+
+                    <div class="slider-group">
+                        <label>
+                            <span>🎯 主动阈值</span>
+                            <span class="value" id="initiative_threshold-value">50</span>
+                        </label>
+                        <input type="range" id="initiative_threshold" min="0" max="100" value="50"
+                               onchange="updateSlider('initiative_threshold', this.value)">
+                        <div class="slider-labels">
+                            <span>被动</span><span>主动</span>
+                        </div>
+                    </div>
+
+                    <div class="slider-group">
+                        <label>
+                            <span>🌊 情绪波动</span>
+                            <span class="value" id="mood_volatility-value">45</span>
+                        </label>
+                        <input type="range" id="mood_volatility" min="0" max="100" value="45"
+                               onchange="updateSlider('mood_volatility', this.value)">
+                        <div class="slider-labels">
+                            <span>稳定</span><span>波动大</span>
+                        </div>
+                    </div>
+
+                    <div class="slider-group">
+                        <label>
+                            <span>😄 幽默度</span>
+                            <span class="value" id="humor-value">55</span>
+                        </label>
+                        <input type="range" id="humor" min="0" max="100" value="55"
+                               onchange="updateSlider('humor', this.value)">
+                        <div class="slider-labels">
+                            <span>正经</span><span>幽默</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-save" onclick="savePersonality()">保存设置</button>
+            </section>
+
+            <!-- 页面：记忆管理 -->
+            <section id="page-memory" class="page">
+                <h1>🧠 记忆管理</h1>
+                <div class="memory-stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="stat-facts">-</div>
+                        <div class="stat-label">记忆事实</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="stat-vectors">-</div>
+                        <div class="stat-label">向量记忆</div>
+                    </div>
+                </div>
+
+                <h3>记忆事实列表</h3>
+                <div class="memory-list" id="memory-list">
+                    <p class="loading">加载中...</p>
+                </div>
+            </section>
+
+            <!-- 页面：系统状态 -->
+            <section id="page-status" class="page">
+                <h1>📊 系统状态</h1>
+
+                <div class="status-grid">
+                    <div class="status-card">
+                        <h3>💪 精力值</h3>
+                        <div class="status-bar">
+                            <div class="status-fill" id="status-energy" style="width: 80%"></div>
+                        </div>
+                        <span class="status-text" id="text-energy">80%</span>
+                    </div>
+
+                    <div class="status-card">
+                        <h3>😊 情绪值</h3>
+                        <div class="status-bar">
+                            <div class="status-fill" id="status-mood" style="width: 75%"></div>
+                        </div>
+                        <span class="status-text" id="text-mood">75%</span>
+                    </div>
+
+                    <div class="status-card">
+                        <h3>💬 社交需求</h3>
+                        <div class="status-bar">
+                            <div class="status-fill" id="status-social" style="width: 40%"></div>
+                        </div>
+                        <span class="status-text" id="text-social">40%</span>
+                    </div>
+                </div>
+
+                <h3>表情包统计</h3>
+                <div class="sticker-stats" id="sticker-stats">
+                    <p class="loading">加载中...</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

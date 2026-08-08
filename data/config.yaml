@@ -1,0 +1,75 @@
+# AI Girlfriend Bot - 配置文件
+# 此文件存储所有可调参数，请通过Web后台修改或直接编辑
+
+# ============ 人格参数 ============
+personality:
+  # 甜度：0(冷淡) - 100(甜蜜)
+  sweetness: 65
+  # 高冷度：0(热情) - 100(高冷)
+  coolness: 30
+  # 主动阈值：触发主动消息的概率基数 (0-100)
+  initiative_threshold: 50
+  # 情绪波动：回复情绪的变化幅度 (0-100)
+  mood_volatility: 45
+  # 幽默度：使用幽默/俏皮回复的概率 (0-100)
+  humor: 55
+
+# ============ 主动行为引擎 ============
+active_behavior:
+  # 精力值：0-100，每秒递减，休息时恢复
+  energy: 80
+  # 情绪值：0-100，影响回复语气
+  mood: 75
+  # 社交需求：0-100，触发主动消息的条件
+  social_need: 40
+  # 主动消息冷却时间（秒）
+  cooldown_seconds: 300
+  # 深夜允许主动消息
+  allow_late_night: true
+  # 凌晨时段定义（小时）
+  late_night_start: 23
+  early_morning_end: 6
+
+# ============ 记忆系统 ============
+memory:
+  # 上下文保留轮数
+  context_turns: 10
+  # 记忆摘要最大长度
+  summary_max_length: 200
+  # 相似度阈值
+  similarity_threshold: 0.7
+  # 每日记忆上限
+  daily_memory_limit: 50
+
+# ============ AI 模型配置 ============
+ai:
+  # 云端对话模型
+  chat_model: "deepseek-chat"
+  chat_api_base: "https://api.deepseek.com/v1"
+  # chat_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  # DeepSeek 免费额度用完时切换
+  # chat_model: "qwen-plus"
+
+  # 本地推理（记忆提取）
+  local_model: "qwen2.5:1.5b"
+  local_api_base: "http://localhost:11434"
+
+  # Embedding 模型
+  embedding_model: "nomic-embed-text"
+
+# ============ 微信配置 ============
+wechat:
+  # 微信协议版本（需与微信版本匹配）
+  protocol_version: "v3"
+  # 自动通过好友请求
+  auto_accept_friend: false
+  # 仅回复私聊
+  private_only: true
+
+# ============ Web 服务 ============
+server:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  # WebSocket刷新间隔（毫秒）
+  ws_ping_interval: 30000

@@ -1,0 +1,32 @@
+# === Runtime / secrets — never commit ===
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Runtime data (记忆/数据库/日志 — 100% 本地，不上传)
+data/*.sqlite
+data/*.db
+data/**/*.sqlite
+data/**/*.db
+*.log
+girl_workspace/memory/
+girl_workspace/**/memory/
+
+# Node / OpenClaw
+node_modules/
+*.openclaw.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
