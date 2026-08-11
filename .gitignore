@@ -27,6 +27,9 @@ web/personality.yaml
 # OpenClaw 工作区状态标记（自动生成）
 girl_workspace/openclaw-workspace-state.json
 
+# 非必要文档不入 git —— 只推代码 + README（用户 git 策略）
+docs/
+
 # Node / OpenClaw
 node_modules/
 *.openclaw.json
