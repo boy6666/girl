@@ -10,14 +10,17 @@ def _pick(bucket: list[str], day: str, rng) -> str:
 
 
 def _seed_entry(content: dict, journal_text: str, day: str, seed=None) -> str:
+    """dry_run 兜底：只拼用户填过的真实事实；没有就不硬造（平淡留白）。"""
     rng = random.Random(seed if seed is not None else day)
     buckets = content.get("buckets", {})
-    morning = _pick(buckets.get("morning", []), day, rng)
-    afternoon = _pick(buckets.get("afternoon", []), day, rng)
-    evening = _pick(buckets.get("evening", []), day, rng)
-    habits = content.get("habits", [])
-    extra = f"中间我又{rng.choice(habits)}。" if habits else ""
-    return f"{morning}。下午{afternoon}。{extra}到了晚上，{evening}。"
+    parts = []
+    for b in ("morning", "work", "afternoon", "evening"):
+        pool = buckets.get(b, [])
+        if pool:
+            parts.append(rng.choice(pool))
+    if not parts:
+        return "今天平平淡淡，没什么特别的事。"
+    return "。".join(parts) + "。"
 
 
 def grow_today(content: dict, journal_text: str, day: str,

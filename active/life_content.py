@@ -1,4 +1,10 @@
-"""life_content.py — 小语的生活内容库 data/life_content.yaml（Web「她的一天」页可编辑）。"""
+"""life_content.py — 小语的生活内容库 data/life_content.yaml（Web「她的一天」页可编辑）。
+
+设计原则（用户确认）：不做死板可爱模板池。这里只是「类别骨架」，短语一律由
+用户在 web 页填入小语的真实生活、或由 LLM 真生长给出；代码不现编内容。
+四段 bucket 依据社科维系策略归类（Stafford & Canary 日常仪式 routine 锚点 +
+Gable & Reis 积极事件分享），默认留空待填。
+"""
 import copy
 from pathlib import Path
 
@@ -8,38 +14,16 @@ LIFE_CONTENT_PATH = Path(__file__).resolve().parents[1] / "data" / "life_content
 
 BUCKETS = ("morning", "work", "afternoon", "evening")
 
+# 默认只有结构，无现编内容：用户在 web 里填小语的真实生活。
 DEFAULT_CONTENT = {
-    "habits": [
-        "喜欢猫，路上看到的猫都会多看两眼",
-        "每周三傍晚去公园散步",
-        "最近在追一部剧，还没看到结尾",
-    ],
-    "favorites": {
-        "color": "暖色调，偏爱橘色",
-        "food": "咖啡和栗子",
-    },
-    "schedule": {"wake": 7},
+    "habits": [],          # 她的习惯（示例在 web 页提示填）——长久的底色
+    "favorites": {},       # 她的偏好（颜色/吃的/地方…）
+    "schedule": {"wake": 7},   # 作息骨架：起床时间（结构性默认，可改）
     "buckets": {
-        "morning": [
-            "晨跑二十分钟，回来冲了杯热咖啡",
-            "赖了会儿床，刷手机看到只猫",
-            "起了个大早，把昨儿没看完的书看完了",
-        ],
-        "work": [
-            "手里那摊活总算弄完一段，腰都直了",
-            "开了一上午的会，脑子嗡嗡的",
-            "写东西卡了半天，刚有点眉目",
-        ],
-        "afternoon": [
-            "楼下那家店新出的栗子味好香，没忍住",
-            "路过看到晚霞，拍了一张",
-            "散步被风一吹，又想起之前那件事",
-        ],
-        "evening": [
-            "洗完澡窝在床上，今天有点累",
-            "追的剧更新了，憋着没忍住先看了",
-            "又觉得一个人待着有点空",
-        ],
+        "morning": [],     # 晨间仪式锚点
+        "work": [],        # 日常劳作
+        "afternoon": [],   # 午后闲暇
+        "evening": [],     # 晚间收尾
     },
 }
 
@@ -56,7 +40,7 @@ def load_content(path: Path = LIFE_CONTENT_PATH) -> dict:
                 out[k] = data[k]
         for b in BUCKETS:
             if data.get("buckets", {}).get(b):
-                out["buckets"][b] = data["buckets"][b]
+                out["buckets"][b] = data["buckets"][b][:25]
     return out
 
 
