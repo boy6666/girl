@@ -2,6 +2,8 @@
 import math
 from datetime import datetime
 
+_ATTACH_MULT = {"anxious": 1.5, "secure": 1.0, "avoidant": 0.7}
+
 
 def _energy_target(hour: int) -> float:
     """作息曲线 → 目标精力 (0-1)。午后高、深夜低。"""
@@ -53,6 +55,16 @@ def tick(state, config, now=None, reply_quality=None) -> dict:
         s["last_real_reply"] = _iso(now)
         s["mood"] = _clamp(s["mood"] + 0.3 * reply_quality, -1.0, 1.0)
     else:
+        # 社交需求按时间涨（越久没被真回越渴望）
+        dt_h = _dt_hours(s, now)
+        moodn = (s["mood"] + 1) / 2            # 情绪好时更想找(0..1)
+        mult = _ATTACH_MULT.get(config.get("attachment", "secure"), 1.0)
+        grow = config["growth_rate_per_hour"] * dt_h * (0.6 + 0.4 * moodn) * mult
+        s["social_need"] = _clamp(s["social_need"] + grow, 0.0, 1.0)
+        # 未回计数：awaiting_reply 时每心跳 +1（封顶 max_unanswered）
+        if s.get("awaiting_reply"):
+            s["unanswered_count"] = min(config["max_unanswered"],
+                                        s["unanswered_count"] + 1)
         base = config.get("mood_baseline", 0.15)
         k = 1 - math.exp(-1.0 / config["mood_time_constant_min"])
         s["mood"] += (base - s["mood"]) * k
@@ -61,3 +73,14 @@ def tick(state, config, now=None, reply_quality=None) -> dict:
     k = 1 - math.exp(-1.0 / config["energy_time_constant_min"])
     s["energy"] = _clamp(s["energy"] + (target - s["energy"]) * k, 0.0, 100.0)
     return s
+
+
+def _dt_hours(state, now) -> float:
+    last = state.get("last_real_reply")
+    if not last:
+        return 1.0
+    try:
+        t0 = datetime.fromisoformat(last)
+        return max(0.0, (now - t0).total_seconds() / 3600.0)
+    except (TypeError, ValueError):
+        return 1.0

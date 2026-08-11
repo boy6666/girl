@@ -38,3 +38,25 @@ def test_reply_bumps_mood_positive():
     s = base(mood=0.0)
     s1 = sm.tick(s, CFG, datetime(2026, 8, 11, 14, 0), reply_quality=0.8)
     assert s1["mood"] > 0.0
+
+
+def test_social_need_grows_without_reply():
+    s = base(social_need=0.0, last_real_reply="2026-08-11T10:00:00")
+    s1 = sm.tick(s, CFG, datetime(2026, 8, 11, 12, 0))  # 2h
+    assert 0.0 < s1["social_need"] < 1.0
+
+
+def test_reply_resets_social_need():
+    s = base(social_need=0.9, mood=0.2)
+    s1 = sm.tick(s, CFG, datetime(2026, 8, 11, 12, 0), reply_quality=0.5)
+    assert s1["social_need"] == 0.0
+    assert s1["awaiting_reply"] is False
+
+
+def test_anxious_grows_faster_than_avoidant():
+    t = datetime(2026, 8, 11, 12, 0)
+    sa = sm.tick(base(social_need=0.0, last_real_reply="2026-08-11T10:00:00"),
+                 {**CFG, "attachment": "anxious"}, t)
+    sv = sm.tick(base(social_need=0.0, last_real_reply="2026-08-11T10:00:00"),
+                 {**CFG, "attachment": "avoidant"}, t)
+    assert sa["social_need"] > sv["social_need"]
