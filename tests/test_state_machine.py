@@ -60,3 +60,48 @@ def test_anxious_grows_faster_than_avoidant():
     sv = sm.tick(base(social_need=0.0, last_real_reply="2026-08-11T10:00:00"),
                  {**CFG, "attachment": "avoidant"}, t)
     assert sa["social_need"] > sv["social_need"]
+
+
+def test_window_closed_when_need_low():
+    assert not sm.should_open_window(base(social_need=0.2), CFG, datetime(2026, 8, 11, 14, 0))
+
+
+def test_window_opens_afternoon():
+    assert sm.should_open_window(base(social_need=0.9, energy=80.0), CFG, datetime(2026, 8, 11, 14, 0))
+
+
+def test_quiet_hours_blocks():
+    assert not sm.should_open_window(base(social_need=0.9, energy=80.0), CFG, datetime(2026, 8, 11, 3, 0))
+
+
+def test_cooldown_blocks():
+    s = base(social_need=0.9, energy=80.0, last_active_ts="2026-08-11T13:58:00")
+    assert not sm.should_open_window(s, CFG, datetime(2026, 8, 11, 14, 0))
+
+
+def test_daily_max_blocks():
+    assert not sm.should_open_window(base(social_need=0.9, energy=80.0, today_active_count=2),
+                                     CFG, datetime(2026, 8, 11, 14, 0))
+
+
+def test_unanswered_max_blocks():
+    assert not sm.should_open_window(base(social_need=0.9, energy=80.0, unanswered_count=3),
+                                     CFG, datetime(2026, 8, 11, 14, 0))
+
+
+def test_energy_low_blocks():
+    assert not sm.should_open_window(base(social_need=0.9, energy=10.0), CFG, datetime(2026, 8, 11, 14, 0))
+
+
+def test_late_night_disabled_blocks():
+    cfg = {**CFG, "allow_late_night": False}
+    assert not sm.should_open_window(base(social_need=0.9, energy=80.0), cfg, datetime(2026, 8, 11, 0, 0))
+
+
+def test_active_sent_increments_and_relief():
+    s1 = sm.on_active_sent(base(social_need=0.9, energy=80.0), CFG, datetime(2026, 8, 11, 14, 0))
+    assert s1["today_active_count"] == 1
+    assert s1["social_need"] < 0.9
+    assert s1["energy"] < 80.0
+    assert s1["awaiting_reply"] is True
+    assert s1["last_active_ts"] is not None

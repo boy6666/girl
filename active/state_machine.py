@@ -84,3 +84,57 @@ def _dt_hours(state, now) -> float:
         return max(0.0, (now - t0).total_seconds() / 3600.0)
     except (TypeError, ValueError):
         return 1.0
+
+
+def should_open_window(state, config, now=None) -> bool:
+    """是否开放一个"主动窗口"（全部守卫满足才 True）。"""
+    now = now or datetime.now()
+    s = _init(state, config)
+    if s["social_need"] < float(config.get("open_threshold", 0.5)):
+        return False
+    if s["energy"] < 20:
+        return False
+
+    hour = now.hour
+    qs, qe = int(config["quiet_start"]), int(config["quiet_end"])
+    in_quiet = (qs <= hour < qe) if qs <= qe else (hour >= qs or hour < qe)
+    if in_quiet:
+        return False
+
+    last_a = s.get("last_active_ts")
+    if last_a:
+        try:
+            t0 = datetime.fromisoformat(last_a)
+            if (now - t0).total_seconds() < config["cooldown_seconds"]:
+                return False
+        except (TypeError, ValueError):
+            pass
+
+    if s["today_active_count"] >= config["daily_max"]:
+        return False
+    if s["unanswered_count"] >= config["max_unanswered"]:
+        return False
+    if not config.get("allow_late_night", True):
+        if hour >= int(config["late_night_start"]) or hour < int(config["early_morning_end"]):
+            return False
+    return True
+
+
+def on_active_sent(state, config, now=None) -> dict:
+    """她真主动发了一条：更新计数/冷却/渴望小缓解/耗精力。"""
+    now = now or datetime.now()
+    s = _init(state, config)
+    if s.get("today") != now.strftime("%Y-%m-%d"):
+        s["today"] = now.strftime("%Y-%m-%d")
+        s["today_active_count"] = 0
+    s["today_active_count"] += 1
+    s["last_active_ts"] = _iso(now)
+    s["awaiting_reply"] = True
+    s["social_need"] = _clamp(s["social_need"] - 0.1, 0.0, 1.0)  # 发了≠被理，只小缓解
+    s["energy"] = _clamp(s["energy"] - 8.0, 0.0, 100.0)
+    return s
+
+
+def on_user_reply(state, config, now=None, quality=0.0) -> dict:
+    """新用户消息到达时调用：归零渴望/未回、记时间、情绪修正。"""
+    return tick(state, config, now, reply_quality=quality)
