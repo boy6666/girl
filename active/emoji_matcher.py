@@ -97,3 +97,21 @@ def mood_to_emotion(mood: float | None, energy: float | None = None) -> str | No
     if mood > 0.3:
         return "joy"
     return None
+
+
+def resolve_char(emotion: str) -> str:
+    """在 EmoTag 里按情绪分排序取榜首；同分用 ESR 极性 tie-break；缺失回退兜底。只回 1 个。"""
+    cand = [r for r in _emotag() if r["score"].get(emotion)]
+    if not cand:
+        return _FALLBACK.get(emotion, "")
+    cand.sort(key=lambda r: r["score"][emotion], reverse=True)
+    top = cand[0]["score"][emotion]
+    esr = _esr()
+    is_pos = emotion in POSITIVE
+    for r in cand:
+        if r["score"][emotion] < top - 1e-9:
+            break                          # 只在前一档里挑，保持情绪纯度
+        p = esr.get(r["char"])
+        if p is None or ((p["pos"] > p["neg"]) == is_pos):
+            return r["char"]
+    return cand[0]["char"]

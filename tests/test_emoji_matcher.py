@@ -27,3 +27,13 @@ def test_mood_to_emotion_bands():
 
 def test_mood_to_emotion_too_tired_returns_none():
     assert em.mood_to_emotion(0.6, 20) is None  # 太累不配表情
+
+
+def test_resolve_char_sadness_top_is_crying(monkeypatch, tmp_path):
+    em.EMOTAG_CSV = tmp_path / "no.csv"          # 数据集缺失 → 兜底
+    em._emotag.cache_clear()
+    assert em.resolve_char("sadness") == em._FALLBACK["sadness"]
+
+
+def test_resolve_char_unknown_emotion_returns_empty():
+    assert em.resolve_char("not-a-real-emotion") == ""
