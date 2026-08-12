@@ -12,6 +12,8 @@
         <div class="logo">💗 小语 · 伴侣后台</div>
         <nav>
             <a class="nav-item active" data-page="personality" href="#"><span class="icon">🎚️</span>人格调参</a>
+            <a class="nav-item" data-page="active" href="#"><span class="icon">⚙️</span>主动状态机</a>
+            <a class="nav-item" data-page="life" href="#"><span class="icon">🌸</span>她的一天</a>
             <a class="nav-item" data-page="memory" href="#"><span class="icon">🧠</span>记忆</a>
             <a class="nav-item" data-page="files" href="#"><span class="icon">📄</span>人格文件</a>
             <a class="nav-item" data-page="behavior" href="#"><span class="icon">🤖</span>行为</a>
@@ -31,6 +33,33 @@
                 <h3>SOUL.md 滑块段预览</h3>
                 <pre id="soul-preview" class="preview-box"></pre>
             </div>
+        </section>
+
+        <!-- 主动状态机 -->
+        <section class="page" id="page-active">
+            <h1>主动状态机</h1>
+            <p class="description">小语的内在状态每 15 分钟推进一次：精力按作息曲线漂移、情绪朝基线回归、渴望越久没被真回越高。只有全部守卫都放行，她才会开口。</p>
+            <div class="gauges" id="active-gauges"></div>
+            <h3>参数（实时保存到 data/config.yaml）</h3>
+            <div class="sliders" id="active-sliders"></div>
+        </section>
+
+        <!-- 她的一天 -->
+        <section class="page" id="page-life">
+            <h1>她的一天</h1>
+            <p class="description">小语是「活」的：她的生活底色由你填（存 life_content.yaml），不是现成模板。填得越细，她过得越真切。</p>
+            <div class="life-preview" id="life-preview"></div>
+            <h3>生活底色（可编辑 · JSON/YAML，保存后生效）</h3>
+            <textarea id="life-content-editor" class="content-editor" spellcheck="false"></textarea>
+            <div class="btn-row">
+                <button class="btn-save" onclick="saveContent()">保存生活底色</button>
+                <button class="btn-ghost" onclick="growToday()">让她今天长一条</button>
+                <button class="btn-ghost" onclick="nudgeNow()">现在就推（试跑·不真发）</button>
+            </div>
+            <h3>生活日志</h3>
+            <div id="life-log" class="preview-box" style="min-height:160px;"></div>
+            <h3>最近一次「推」的卡片</h3>
+            <pre id="life-nudge-card" class="preview-box" style="min-height:90px;"></pre>
         </section>
 
         <!-- 记忆 -->

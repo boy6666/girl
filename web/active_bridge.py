@@ -8,6 +8,7 @@ from pathlib import Path
 
 import yaml
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
@@ -123,6 +124,17 @@ async def get_content():
 
 @router.post("/content")
 async def set_content(payload: dict):
+    # 前端文本编辑器直接发整份 life_content（JSON/YAML）文本
+    if "yaml" in payload:
+        try:
+            text = yaml.safe_load(payload["yaml"])
+        except yaml.YAMLError as e:
+            return JSONResponse({"error": f"YAML 解析失败: {e}"}, status_code=400)
+        if isinstance(text, dict):
+            life_content.save_content(text, CONTENT)
+            return life_content.load_content(CONTENT)
+        return JSONResponse({"error": "内容必须是一个对象"}, status_code=400)
+    # 结构化合并（Task 11 行为）
     content = life_content.load_content(CONTENT)
     if "habits" in payload:
         content["habits"] = payload["habits"]

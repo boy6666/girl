@@ -21,6 +21,8 @@ document.querySelectorAll('.nav-item').forEach(item => {
         if (page === 'files') loadFiles();
         if (page === 'behavior') loadBehavior();
         if (page === 'status') loadStatus();
+        if (page === 'active') loadActive();
+        if (page === 'life') loadLife();
     });
 });
 
@@ -177,6 +179,169 @@ async function loadStatus() {
     } catch (e) {
         showToast('加载状态失败');
     }
+}
+
+// ============ 主动状态机 ============
+const ACTIVE_RANGE_FIELDS = [
+    { k: 'open_threshold',    min: 0,   max: 1,    step: 0.05, label: '开启阈值' },
+    { k: 'cooldown_seconds',  min: 60,  max: 3600, step: 60,   label: '主动冷却(秒)' },
+    { k: 'daily_max',         min: 1,   max: 10,   step: 1,    label: '每日上限' },
+    { k: 'max_unanswered',    min: 1,   max: 10,   step: 1,    label: '未回上限' },
+    { k: 'late_night_start',  min: 0,   max: 23,   step: 1,    label: '深夜窗口开始' },
+    { k: 'early_morning_end', min: 1,   max: 8,    step: 1,    label: '深夜窗口结束' },
+];
+const ACTIVE_SELECT_FIELDS = [
+    { k: 'attachment',      options: ['secure', 'anxious', 'avoidant'], label: '依恋类型(0回避=secure=焦虑1)' },
+    { k: 'grow_provider',   options: ['dry_run', 'openclaw'],           label: '生长方式(dry=样例 / openclaw=真生长)' },
+    { k: 'inject_provider', options: ['dry_run', 'openclaw'],           label: '注入方式(dry=试跑 / openclaw=真发)' },
+];
+
+async function loadActive() {
+    try {
+        const [cfg, state] = await Promise.all([
+            fetch('/api/active/config').then(r => r.json()),
+            fetch('/api/active/state').then(r => r.json()),
+        ]);
+        renderGauges(state);
+        renderActiveSliders(cfg);
+    } catch (e) { showToast('加载主动状态机失败'); }
+}
+
+function renderGauges(state) {
+    const wrap = document.getElementById('active-gauges');
+    const e = Math.max(0, Math.min(100, state.energy ?? 0));
+    const m = Math.max(0, Math.min(1, ((state.mood ?? 0) + 1) / 2));
+    const s = Math.max(0, Math.min(1, state.social_need ?? 0));
+    wrap.innerHTML = [
+        ['精力', e / 100, '#ff6b9d', `${Math.round(e)}`],
+        ['情绪', m, '#7c3aed', `${Math.round(m * 100)}`],
+        ['渴望', s, '#22c55e', `${Math.round(s * 100)}`],
+    ].map(([label, ratio, color, text]) => gaugeSVG(label, ratio, color, text)).join('');
+}
+
+function gaugeSVG(label, ratio, color, text) {
+    const r = 40, c = 2 * Math.PI * r;
+    const off = c * (1 - ratio);
+    return `<div class="gauge">
+        <svg width="110" height="110" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
+            <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"
+                transform="rotate(-90 50 50)"/>
+            <text x="50" y="50" text-anchor="middle" dy=".35em" fill="white" font-size="20" font-weight="bold">${text}</text>
+        </svg>
+        <div class="gauge-label">${label}</div>
+    </div>`;
+}
+
+function renderActiveSliders(cfg) {
+    const wrap = document.getElementById('active-sliders');
+    let html = ACTIVE_RANGE_FIELDS.map(f => `
+        <div class="slider-group">
+            <label>${f.label} <span class="value" id="act-${f.k}-v">${cfg[f.k] ?? f.min}</span></label>
+            <input type="range" min="${f.min}" max="${f.max}" step="${f.step}"
+                   value="${cfg[f.k] ?? f.min}" id="act-${f.k}" data-key="${f.k}">
+        </div>`).join('');
+    ACTIVE_SELECT_FIELDS.forEach(f => {
+        const cur = cfg[f.k] ?? f.options[0];
+        html += `<div class="slider-group sel">
+            <label>${f.label}</label>
+            <select id="act-${f.k}" data-key="${f.k}">
+                ${f.options.map(o => `<option value="${o}" ${o === cur ? 'selected' : ''}>${o}</option>`).join('')}
+            </select></div>`;
+    });
+    wrap.innerHTML = html;
+    wrap.querySelectorAll('input[type=range]').forEach(el => {
+        el.oninput = () => {
+            document.getElementById(`act-${el.dataset.key}-v`).textContent = el.value;
+            saveActiveConfig();
+        };
+    });
+    wrap.querySelectorAll('select').forEach(el => { el.onchange = saveActiveConfig; });
+}
+
+let _saveTimer = null;
+async function saveActiveConfig() {
+    const payload = {};
+    ACTIVE_RANGE_FIELDS.forEach(f => {
+        const el = document.getElementById(`act-${f.k}`);
+        payload[f.k] = Number(el.value);
+    });
+    ACTIVE_SELECT_FIELDS.forEach(f => {
+        const el = document.getElementById(`act-${f.k}`);
+        payload[f.k] = el.value;
+    });
+    clearTimeout(_saveTimer);
+    _saveTimer = setTimeout(async () => {
+        try {
+            const res = await (await fetch('/api/active/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })).json();
+            showToast('主动状态机参数已保存');
+            return res;
+        } catch (e) { showToast('保存参数失败'); }
+    }, 500);
+}
+
+// ============ 她的一天 ============
+async function loadLife() {
+    try {
+        const [life, content, journal] = await Promise.all([
+            fetch('/api/active/life').then(r => r.json()),
+            fetch('/api/active/content').then(r => r.json()),
+            fetch('/api/active/journal').then(r => r.json()),
+        ]);
+        document.getElementById('life-preview').innerHTML =
+            `<div class="stat-card"><div class="stat-number">${escapeHtml(life.now_activity)}</div><div class="stat-label">现在在干嘛</div></div>
+             <div class="stat-card wide"><div class="stat-label">今天高光</div>
+                <div class="status-big">${life.highlights.length ? life.highlights.map(escapeHtml).join(' · ') : '（今天还没填高光——去给她的一天写点底色）'}</div>
+             </div>`;
+        document.getElementById('life-content-editor').value =
+            JSON.stringify(content, null, 2);
+        renderJournal(journal);
+    } catch (e) { showToast('加载「她的一天」失败'); }
+}
+
+function renderJournal(journal) {
+    const t = (journal && journal.text || '').trim();
+    document.getElementById('life-log').textContent =
+        (journal && journal.last ? `最近日志: ${journal.last}\n\n` : '') + (t || '（还没有生活日志——点「让她今天长一条」生成）');
+}
+
+async function saveContent() {
+    const yamlText = document.getElementById('life-content-editor').value;
+    try {
+        const res = await (await fetch('/api/active/content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ yaml: yamlText }),
+        })).json();
+        if (res.error) { showToast(res.error); return; }
+        document.getElementById('life-content-editor').value = JSON.stringify(res, null, 2);
+        showToast('✓ 生活底色已保存');
+        const life = await (await fetch('/api/active/life')).json();
+        document.getElementById('life-preview').innerHTML =
+            `<div class="stat-card"><div class="stat-number">${escapeHtml(life.now_activity)}</div><div class="stat-label">现在在干嘛</div></div>`;
+    } catch (e) { showToast('保存失败'); }
+}
+
+async function growToday() {
+    try {
+        const j = await (await fetch('/api/active/grow', { method: 'POST' })).json();
+        showToast(j.text ? '✓ 已生长一条' : '（本次没长出内容）');
+        loadLife();
+    } catch (e) { showToast('生长失败'); }
+}
+
+async function nudgeNow() {
+    try {
+        const j = await (await fetch('/api/active/nudge', { method: 'POST' })).json();
+        document.getElementById('life-nudge-card').textContent =
+            `卡片:\n${j.card}\n\n注入: ${j.inject.provider} · sent=${j.inject.sent}`;
+        showToast(j.inject.sent ? '（真的被推了一次）' : '试跑：卡片已生成，未真发');
+    } catch (e) { showToast('推送失败'); }
 }
 
 // ============ 工具 ============
