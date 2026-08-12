@@ -24,6 +24,11 @@ girl_workspace/**/memory/
 # Web 后台运行态（滑块当前值，不入库）
 web/personality.yaml
 
+# 主动状态机运行态 + 小语的生活（100% 本机私人数据，不入库）
+data/state.json
+data/life_journal.md
+data/life_content.yaml
+
 # OpenClaw 工作区状态标记（自动生成）
 girl_workspace/openclaw-workspace-state.json
 

@@ -18,10 +18,14 @@ python -m uvicorn web.main:app --host 127.0.0.1 --port 18780
 ## 页面
 
 - **人格调参**：5 维滑块（甜度/高冷/主动阈值/情绪波动/幽默）→ 保存后 `soul_render.py` 渲染并**重写 `girl_workspace/SOUL.md` 的滑块段**。SOUL.md 在会话启动时读取，所以**下一条微信消息生效**，无需重启。
+- **主动状态机**：三环仪表实时看精力/情绪/渴望；参数滑块（开启阈值/冷却/每日上限/勿扰/深夜窗口/依恋轴/生长·注入方式）保存到 `data/config.yaml` 的 `active_behavior`。每 15 分钟心跳推进一次状态。
+- **她的一天**：小语的生活底色（`data/life_content.yaml`，JSON/YAML 直接编辑）+ 生活日志预览 + 「让她今天长一条」（grow）+「现在就推（试跑）」（nudge，dry_run 不真发）。
 - **记忆**：读 OpenClaw `girl` agent 的会话（`~\.openclaw\agents\girl\sessions\`），展示小语聊过的对话。
 - **人格文件**：只读展示 `girl_workspace/` 下的 SOUL/AGENTS/IDENTITY/USER.md。
-- **行为**：读写 `data/config.yaml` 的 `active_behavior`（V1 定时主动的基础；V1.5 状态机接管 energy/mood/social_need）。
+- **行为**：V1 遗留页（读写 `data/config.yaml` 的 `active_behavior` 旧键），新参数请用「主动状态机」页。
 - **状态**：模型 / 通道 / agent 接线概览。
+
+> **默认档「自然淡雅」**：`open_threshold=0.5`、`daily_max=2`、`quiet 02:00–05:00`、`cooldown=300s`、`attachment=secure`。不催、不吵、走得近但留有分寸。
 
 ## 文件
 
