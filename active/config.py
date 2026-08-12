@@ -19,6 +19,8 @@ CONFIG_DEFAULTS = {
     "seed_mood": 0.2,
     "grow_provider": "dry_run",      # dry_run | openclaw（真生长见 Task 14）
     "inject_provider": "dry_run",    # dry_run | openclaw（真注入见 Task 14）
+    "emoji_mode": "off",                    # off | char | image — 表情出口；image 需接真后再启用
+    "emoji_sources": ["adesk", "sogou"],    # image 模式的稳定图源，可自配
 }
 
 

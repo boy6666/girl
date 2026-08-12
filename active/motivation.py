@@ -6,7 +6,7 @@
 """
 from datetime import datetime
 
-from . import life_journal, life_sim
+from . import life_journal, life_sim, emoji_matcher
 
 
 def _state_words(s: dict) -> str:
@@ -31,8 +31,22 @@ def _state_words(s: dict) -> str:
     return f"精力{now}，{mood}"
 
 
+def _emoji_suggestion(state: dict, mode: str) -> str:
+    if mode == "off":
+        return ""
+    em = emoji_matcher.mood_to_emotion(state.get("mood"), state.get("energy"))
+    if not em:
+        return ""
+    if mode == "char":
+        return f"【表情】此刻情绪合适用「{emoji_matcher.resolve_char(em)}」这种，一个就够"
+    if mode == "image":
+        return f"【表情】图库检索词：{em}（走图源 API）"
+    return ""
+
+
 def build_motivation_card(state: dict, content: dict, journal: str, day: str,
-                          now: datetime | None = None) -> str:
+                          now: datetime | None = None,
+                          emoji_mode: str = "off") -> str:
     now = now or datetime.now()
     act = life_sim.current_activity(content, day, now.hour)
     highs = life_sim.today_highlights(content, day, now.hour)
@@ -49,4 +63,7 @@ def build_motivation_card(state: dict, content: dict, journal: str, day: str,
     if dream:
         lines.append(f"【梦】{dream}")
     lines.append(f"【状态】{_state_words(state)}，有点想你，但我不必现在就说")
+    hint = _emoji_suggestion(state, emoji_mode)
+    if hint:
+        lines.append(hint)
     return "\n".join(lines)

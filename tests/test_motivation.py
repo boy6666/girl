@@ -30,3 +30,18 @@ def test_card_graceful_when_no_content():
     # 无高光/无梦/无昨日 → 不给【今天】【梦】段（不硬造）
     assert "【今天】" not in card
     assert "【梦】" not in card
+
+
+from active.motivation import build_motivation_card  # noqa: E402
+
+
+def test_card_default_off_has_no_emoji_line():
+    state = {"energy": 80, "mood": 0.6}
+    card = build_motivation_card(state, {}, "", "2026-08-12")
+    assert "【表情】" not in card
+
+
+def test_card_char_mode_appends_emoji_line():
+    state = {"energy": 80, "mood": 0.6}
+    card = build_motivation_card(state, {}, "", "2026-08-12", emoji_mode="char")
+    assert "【表情】" in card

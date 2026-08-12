@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
-                    motivation, injector)
+                    motivation, emoji_matcher, injector)
 
 log = logging.getLogger("web.active")
 
@@ -46,7 +46,8 @@ def _heartbeat_loop():
                 content = life_content.load_content(CONTENT)
                 journal = life_journal.read_journal()
                 card = motivation.build_motivation_card(
-                    nxt, content, journal, str(datetime.now().date()))
+                    nxt, content, journal, str(datetime.now().date()),
+                    emoji_mode=c.get("emoji_mode", "off"))
                 _on_window(card)
                 st2 = state_machine.on_active_sent(nxt, c)
                 state_store.save(st2, STATE)
@@ -176,7 +177,26 @@ async def nudge():
     journal = life_journal.read_journal()
     st = state_store.load(STATE)
     day = str(datetime.now().date())
-    card = motivation.build_motivation_card(st, content, journal, day)
+    card = motivation.build_motivation_card(
+        st, content, journal, day,
+        emoji_mode=_active_cfg().get("emoji_mode", "off"))
     res = injector.inject_motivation(
         card, provider=_active_cfg().get("inject_provider", "dry_run"))
     return {"card": card, "inject": res}
+
+
+@router.get("/emoji/resolve")
+async def emoji_resolve(emotion: str = "", keyword: str = "",
+                        mode: str = ""):
+    """后台试跑（dry-run）：情绪/关键词 → 字符或图 URL。mode 缺省读配置。"""
+    cfg = _active_cfg()
+    mode = mode or cfg.get("emoji_mode", "off")
+    kw = keyword or emotion
+    em = emoji_matcher.emotion_from_keyword(kw) or kw.lower()
+    out = {"mode": mode, "keyword": kw}
+    if mode == "char":
+        out["char"] = emoji_matcher.resolve_char(em) if em in emoji_matcher.EMOTIONS else ""
+    elif mode == "image":
+        out["image"] = emoji_matcher.resolve_image(
+            kw, cfg.get("emoji_sources") or ["adesk", "sogou"])
+    return out

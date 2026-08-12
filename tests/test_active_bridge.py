@@ -22,3 +22,26 @@ def test_on_window_openclaw_writes_card_not_sends(monkeypatch, tmp_path):
     assert r["sent"] is False          # 写文件 ≠ 发微信
     assert r["written"] is True
     assert hp.read_text(encoding="utf-8") == "【现在】在看书\n"
+
+
+import asyncio  # noqa: E402
+
+
+def test_emoji_resolve_char_backend():
+    from web.active_bridge import emoji_resolve
+    out = asyncio.run(emoji_resolve(emotion="开心", keyword="", mode="char"))
+    assert out["mode"] == "char"
+    assert out["keyword"] in ("开心", "joy")
+    assert out["char"]          # 非空——解析出一个字符
+
+
+def test_emoji_resolve_image_backend_defaults_to_config(monkeypatch):
+    monkeypatch.setattr(active_bridge, "_active_cfg",
+                        lambda: {"emoji_mode": "image",
+                                 "emoji_sources": ["adesk"]})
+    monkeypatch.setattr(
+        active_bridge.emoji_matcher, "_http_get_json",
+        lambda *a, **k: {"res": {"data": [{"url": "https://x/a.png"}]}})
+    out = asyncio.run(active_bridge.emoji_resolve(keyword="开心", emotion="", mode=""))
+    assert out["mode"] == "image"
+    assert out["image"]["provider"] == "adesk"
