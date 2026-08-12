@@ -88,18 +88,47 @@ girl/
 
 ---
 
-## 启动
+## 启动与配置
 
-### 1. OpenClaw（她的"声音"）
+系统分两半：**OpenClaw**（她的声音 + 微信出口）和 **Web 伴侣后台**（你的遥控器 + V1.5 状态机）。两边都起来才是一个完整的小语。
+
+### 0. 一次性初始化 OpenClaw（首次）
 
 ```bash
-openclaw daemon start        # 或按你本机的服务方式
-openclaw status              # 网关/通道健康
+openclaw configure --section model     # 配模型 provider：DeepSeek API key（本机 ~\.openclaw\，不入库）
+openclaw configure --section gateway   # 网关/服务（可选）
 ```
 
-确保 `girl` agent 绑定微信通道、工作区指向本仓库 `girl_workspace/`。
+**接入微信通道**（ClawBot 插件）：
 
-### 2. Web 伴侣后台（你的"遥控器"）
+```bash
+openclaw channels add --channel openclaw-weixin   # 引导式登录微信（扫码/协议）
+openclaw channels status --probe                  # 探活通道
+```
+
+**准备 `girl` agent**（本仓库已随 `girl_workspace/` 带好人设，关键一步是让它的工作区指向这里）：
+
+```bash
+openclaw agents list        # 确认 girl 存在
+openclaw agents add         # 没有则新建（id: girl）
+openclaw agents bind        # 建路由：openclaw-weixin → girl（微信进来走 girl）
+```
+
+> 她读的文件都在 `girl_workspace/`：`SOUL.md`（人格·滑块渲染目标）、`AGENTS.md`（行为规则）、`IDENTITY.md`（名字/设定）、`USER.md`（关于你）、`HEARTBEAT.md`（主动心跳钩子）。
+
+### 1. 启动 OpenClaw 服务（她的"声音"）
+
+```bash
+openclaw daemon install     # 首次：装成系统服务（Windows: schtasks 计划任务）
+openclaw daemon start
+openclaw daemon status      # 服务状态 + 网关连通性
+openclaw channels status --probe   # 微信通道在线？
+openclaw agents list                # 确认 girl 已绑定 openclaw-weixin
+```
+
+确认：`girl` agent 绑定微信通道、工作区指向本仓库 `girl_workspace/`（见 `active/` 从 `girl_workspace/memory/heartbeat.md` 读动机卡片）。
+
+### 2. 启动 Web 伴侣后台（你的"遥控器"）
 
 ```bash
 cd E:/college_information/girl
@@ -107,11 +136,36 @@ pip install -r web/requirements.txt   # 首次
 python -m uvicorn web.main:app --port 18780
 ```
 
-打开 http://127.0.0.1:18780
+打开 http://127.0.0.1:18780（后台细节见 `web/README.md`）
 
 ### 3. 主动行为（V1.5）
 
-heartbeat 每 15 分钟推进一次状态；当全部守卫放行（阈值/冷却/每日上限/勿扰/未回）时才可能主动开口。想让小语真开口，把 `data/config.yaml` 的 `inject_provider` 从 `dry_run` 翻成 `openclaw`（生长对应 `grow_provider`）。**默认 `dry_run`，只拼卡片不真发**——先看清楚她要说什么，再放她出去。
+heartbeat 每 15 分钟推进一次状态（`tick_minutes`）；当**全部守卫放行**（阈值/能量/勿扰/冷却/每日上限/未回上限）时才可能主动开口。想试运行、看她会说什么而不真发：保持默认 `dry_run`，在后台「她的一天」点「现在就推」看卡片。想让小语真开口，把 `data/config.yaml` 的 provider 翻成 `openclaw`：
+
+| 键 | 默认 | 含义 |
+|---|---|---|
+| `inject_provider` | `dry_run` | 动机卡片怎么送：`dry_run` 只拼不真发；`openclaw` 写进心跳文件由小语决定说不说 |
+| `grow_provider` | `dry_run` | 生活日志怎么长：`dry_run` 用你填的底色拼接；`openclaw` 由小语用自己声音写当天 |
+
+**关键参数表**（`data/config.yaml` → `active_behavior`）：
+
+| 键 | 默认 | 含义 |
+|---|---|---|
+| `open_threshold` | 0.5 | social_need 达到多少才考虑开窗 |
+| `cooldown_seconds` | 300 | 主动冷却（秒） |
+| `daily_max` | 2 | 每日主动上限（次） |
+| `quiet_start` / `quiet_end` | 2 / 5 | 勿扰硬墙时辰（绝不在此时主动） |
+| `max_unanswered` | 3 | 连续未回上限（达到暂停催人） |
+| `allow_late_night` / `late_night_start` / `early_morning_end` | true / 23 / 6 | 深夜软窗口 |
+| `tick_minutes` | 15 | 心跳间隔 |
+| `growth_rate_per_hour` | 0.12 | 思念涨速（每小时基数） |
+| `energy_time_constant_min` | 240 | 精力漂移常数（4h） |
+| `mood_time_constant_min` | 360 | 情绪回基线常数（6h） |
+| `mood_baseline` | 0.15 | 情绪基线 |
+| `attachment` | `secure` | 依恋类型：`secure` / `anxious` / `avoidant`（调制思念涨速） |
+| `seed_energy` / `seed_mood` | 80.0 / 0.2 | 首次 tick 种子状态 |
+
+**⚠️ 切真前**：先在「她的一天」页用「现在就推」（试跑）看卡片和小语的反应，确认无误再把 `inject_provider` 翻成 `openclaw`。默认全程 `dry_run`，Python 后端永不直接发微信。
 
 ---
 
