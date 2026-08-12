@@ -53,6 +53,7 @@
 | **生活模拟** | 小时段生活底色 + 非每日的日间残余梦境；动机卡片【现在】【今天】【昨天】【梦】【状态】——只讲真实发生的，不现编模板 |
 | **Web 后台** | 人格调参 / 记忆可视化 / 主动状态机（三环仪表+参数滑块）/ 她的一天（生活底色编辑 + 「长一条」+「推一次」）/ 状态 |
 | **成长** | 生活日志 `data/life_journal.md`，grow 按她真实生活底色生长当天记录 |
+| **表情（②）** | 情绪/关键词 → 表情：字符出口（本地标注数据集 + 1 个 emoji 字符）或图源出口（adesk/sogou 稳定 API → 表情图 URL）；默认 `off` |
 
 **默认档「自然淡雅」**：开启阈值 0.5、每日上限 2、勿扰 02:00–05:00、冷却 300s、依恋安全型。不催、不吵、走得近但留有分寸。
 
@@ -89,6 +90,7 @@ girl/
 │   ├── life_sim.py         #   当下活动 + 非每日梦境
 │   ├── life_grower.py      #   生长当天生活记录
 │   ├── motivation.py       #   动机卡片（社科细颗粒，不硬造）
+│   ├── emoji_matcher.py    #   表情解析层：情绪/关键词→字符 or 图 URL
 │   ├── heartbeat.py        #   每 tick_minutes 推进状态
 │   └── injector.py         #   单一出口：把卡片写进心跳文件
 ├── web/                    # FastAPI 伴侣后台
@@ -99,7 +101,7 @@ girl/
 │   ├── templates/ static/  #   前端
 │   └── README.md           #   后台使用说明
 ├── girl_workspace/         # OpenClaw girl agent 工作区（人格/规则/心跳钩子）
-├── tests/                  # 42 个测试（pytest）
+├── tests/                  # 58 个测试（pytest）
 ├── data/                   # 运行态：config.yaml / state.json / 生活 / 日志（本地）
 └── app/, main.py           # （旧自研引擎，已由 OpenClaw 接管的占位）
 ```
@@ -185,12 +187,30 @@ heartbeat 每 15 分钟推进一次状态（`tick_minutes`）；当**全部守�
 
 **⚠️ 切真前**：先在「她的一天」页用「现在就推」（试跑）看卡片和小语的反应，确认无误再把 `inject_provider` 翻成 `openclaw`。默认全程 `dry_run`，Python 后端永不直接发微信。
 
+### 4. 表情源配置（② 表情包语义匹配）
+
+小语的情绪/关键词可以变成一个**表情**，两个出口二选一（`data/config.yaml` → `active_behavior.emoji_mode`）：
+
+| 模式 | 行为 | 特点 |
+|---|---|---|
+| `off` | 关闭表情出口（**默认**） | 接真前保持现状 |
+| `char` | 按本地标注数据集 → **1 个 emoji 字符** | 纯文本、嵌套在同一条消息里、微信原生渲染、零发送成本 |
+| `image` | 按情绪/关键词调稳定图源 API → **表情图 URL** | 要真发图需先接真/开 IMAGE 通道 |
+
+- **字符出口（char）**：数据来自 `data/emoji/`（EmoTag 150 表情×8 情绪 + Emoji Sentiment Ranking 751 表情×极性，本地自用 ~第三方数据集，gitignored）。状态机 mood/energy → 情绪 → 在 EmoTag 按情绪分取榜首、用 ESR 极性 tie-break，**只出 1 个**（反 AI 腔「一个就够」）。数据集缺失自动降级到内置兜底表，不崩。
+- **图源出口（image）**：稳定 JSON 图源两个（均实测）：`adesk`（`so.picasso.adesk.com`）、`sogou`（`image.sogou.com/napi/wap/pic`），多源顺序 fallback。其余（doutula/fabiaoqing 等）是 HTML 抓取、实测不稳，**未收录**。
+- **配置**：`emoji_mode`（off/char/image）+ `emoji_sources`（图源列表）。改完重启后台生效。想自挂图源：补 `active/emoji_matcher.py` 的 `SOURCES` 条目，或在此覆盖 providers。
+- **试跑**：后台 `GET /api/active/emoji/resolve?emotion=开心&mode=char`（或带 `mode=image`）看解析结果——全程 dry-run，不真发。
+- image 出口**只解析到 URL**，不发图；真发图走单一出口（OpenClaw），先接真再切 `image`。
+
+> 无密钥配置模板见仓库根 `config.example.yaml`（复制为 `data/config.yaml` 后按需改，密钥/token 勿提交）。
+
 ---
 
 ## 测试
 
 ```bash
-python -m pytest        # 42 passed
+python -m pytest        # 58 passed
 ```
 
 ---

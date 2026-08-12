@@ -1,0 +1,22 @@
+# config.example.yaml — 小语配置模板（复制为 data/config.yaml 后用）
+# 注意：data/config.yaml 若含密钥/token 请勿提交 git；本模板本身不含任何密钥。
+# 完整参数默认值见 active/config.py 的 CONFIG_DEFAULTS（唯一真相）。
+
+active_behavior:
+  # --- 主动状态机（V1.5）核心参数（按需改，其余用默认） ---
+  # open_threshold: 0.5        # social_need 达到多少才考虑开窗
+  # daily_max: 2               # 每日主动上限（次）
+  # quiet_start: 2             # 勿扰硬墙开始（时）
+  # quiet_end: 5               # 勿扰硬墙结束（时）
+  # attachment: secure         # secure | anxious | avoidant
+
+  # --- 表情包语义匹配（②） ---
+  emoji_mode: off        # off | char | image
+  #  char : 按本地标注数据集(EmoTag/Emoji Sentiment Ranking)→ 1 个 emoji 字符。
+  #         纯文本、嵌套在同一条消息里、微信原生渲染、零发送成本。
+  #  image: 按情绪/关键词调稳定图源 API → 表情图 URL（真发图需先接真/开 IMAGE 通道）。
+  #  off  : 关闭表情出口（默认，接真前保持现状）。
+  emoji_sources:
+    - adesk      # 稳定 JSON 图源：so.picasso.adesk.com（推荐首选）
+    - sogou      # 稳定 JSON 图源：image.sogou.com/napi/wap/pic（fallback）
+  # 想自挂图源：改 active/emoji_matcher.py 的 SOURCES 条目，或在此覆盖 providers。
