@@ -11,6 +11,7 @@ web/main.py — 小语的 Web 伴侣后台（FastAPI）
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -21,12 +22,20 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import agent_admin, soul_render
+from .active_bridge import register_active
 
 BASE = Path(__file__).resolve().parent
 PERSONALITY_YAML = BASE / "personality.yaml"
 BEHAVIOR_YAML = BASE.parent / "data" / "config.yaml"
 
-app = FastAPI(title="小语 · 伴侣后台", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    register_active(app)   # 起心跳 daemon 线程 + 挂 /api/active/* 路由
+    yield
+
+
+app = FastAPI(title="小语 · 伴侣后台", version="0.1.0", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=BASE / "templates")

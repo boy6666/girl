@@ -29,13 +29,14 @@ def _clamp(v, lo, hi):
 
 
 def _init(state, config):
-    """首次 tick 用 seed 填 energy/mood。"""
+    """首次 tick 用 seed 填 energy/mood，并标记已初始化（供 heartbeat 判断）。"""
     s = dict(state)
     if s.get("energy") is None:
         s["energy"] = float(config.get("seed_energy", 80.0))
     if s.get("mood") is None:
         s["mood"] = float(config.get("seed_mood", 0.2))
     s["social_need"] = float(s.get("social_need", 0.0) or 0.0)
+    s["initialized"] = True
     return s
 
 
