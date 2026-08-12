@@ -9,6 +9,9 @@
 from __future__ import annotations
 
 import csv
+import json
+import urllib.parse
+import urllib.request
 from functools import lru_cache
 from pathlib import Path
 
@@ -115,3 +118,54 @@ def resolve_char(emotion: str) -> str:
         if p is None or ((p["pos"] > p["neg"]) == is_pos):
             return r["char"]
     return cand[0]["char"]
+
+
+# 稳定 JSON 图源：(provider, base_url, 固定查询参数, headers)
+SOURCES = {
+    "adesk": ("adesk", "https://so.picasso.adesk.com/emoji/v1/resource",
+              "from=select&limit=6&order=new",
+              {"Referer": "http://emoji.adesk.com/"}),
+    "sogou": ("sogou", "https://image.sogou.com/napi/wap/pic",
+              "start=0&len=6",
+              {"User-Agent": "Mozilla/5.0"}),
+}
+
+
+def _http_get_json(url: str, headers: dict, timeout: float = 12.0) -> dict | None:
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8", "replace"))
+    except Exception:
+        return None
+
+
+def _extract(data: dict | None, provider: str) -> str | None:
+    if not data:
+        return None
+    if provider == "adesk":
+        items = (data.get("res") or {}).get("data") or []
+        if items:
+            for k in ("big_url", "static_url", "url"):
+                if items[0].get(k):
+                    return items[0][k]
+    elif provider == "sogou":
+        items = (data.get("data") or {}).get("items") or []
+        if items:
+            return items[0].get("picUrl") or items[0].get("oriPicUrl")
+    return None
+
+
+def resolve_image(keyword: str, sources: list[str] | None = None,
+                  timeout: float = 12.0) -> dict | None:
+    """按关键词在稳定图源里抓一张图的 URL；返回 {"url","provider"}，全挂返回 None。"""
+    for name in sources or ["adesk", "sogou"]:
+        spec = SOURCES.get(name)
+        if not spec:
+            continue
+        _, base, params, headers = spec
+        url = f"{base}?{params}&keyword={urllib.parse.quote(keyword)}"
+        img = _extract(_http_get_json(url, headers, timeout), name)
+        if img:
+            return {"url": img, "provider": name}
+    return None

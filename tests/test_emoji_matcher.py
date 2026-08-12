@@ -37,3 +37,32 @@ def test_resolve_char_sadness_top_is_crying(monkeypatch, tmp_path):
 
 def test_resolve_char_unknown_emotion_returns_empty():
     assert em.resolve_char("not-a-real-emotion") == ""
+
+
+def _fake_adesk(url, headers, timeout):
+    return {"res": {"data": [{"big_url": "https://img/ade.png", "url": "https://img/ade.png"}]}}
+
+
+def test_resolve_image_adesk_first(monkeypatch):
+    monkeypatch.setattr(em, "_http_get_json", _fake_adesk)
+    out = em.resolve_image("开心")
+    assert out == {"url": "https://img/ade.png", "provider": "adesk"}
+
+
+def test_resolve_image_falls_back_to_sogou(monkeypatch):
+    calls = {}
+
+    def fake(url, headers, timeout):
+        calls["n"] = calls.get("n", 0) + 1
+        if calls["n"] == 1:
+            return None            # adesk 挂
+        return {"data": {"items": [{"picUrl": "https://img/sg.png"}]}}
+
+    monkeypatch.setattr(em, "_http_get_json", fake)
+    out = em.resolve_image("开心")
+    assert out == {"url": "https://img/sg.png", "provider": "sogou"}
+
+
+def test_resolve_image_all_down_returns_none(monkeypatch):
+    monkeypatch.setattr(em, "_http_get_json", lambda *a, **k: None)
+    assert em.resolve_image("开心") is None
