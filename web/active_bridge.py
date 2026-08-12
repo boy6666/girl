@@ -28,8 +28,10 @@ _thread = None
 # ---------- 心跳线程 ----------
 
 def _on_window(card: str):
-    # Task 14 换真：injector.inject_motivation(card, provider=_active_cfg().get("inject_provider"))
-    injector.inject_motivation(card, provider="dry_run")
+    # 自动窗口也读 inject_provider（与 /nudge 一致）：dry_run 只打印；
+    # openclaw 把卡片写进心跳文件由小语决定说不说。默认 dry_run，可回滚。
+    return injector.inject_motivation(
+        card, provider=_active_cfg().get("inject_provider", "dry_run"))
 
 
 def _heartbeat_loop():
