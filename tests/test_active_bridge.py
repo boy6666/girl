@@ -45,3 +45,32 @@ def test_emoji_resolve_image_backend_defaults_to_config(monkeypatch):
     out = asyncio.run(active_bridge.emoji_resolve(keyword="开心", emotion="", mode=""))
     assert out["mode"] == "image"
     assert out["image"]["provider"] == "adesk"
+
+
+def test_inject_reflection_defaults_to_dry_run(monkeypatch, tmp_path):
+    from active import reflection
+    r = reflection.inject_reflection_card("【日期】2026-08-13", "dry_run",
+                                          path=tmp_path / "r.md")
+    assert r["dry_run"] is True and r["sent"] is False
+    assert not (tmp_path / "r.md").exists()
+
+
+def test_reflection_cfg_merges_top_level(monkeypatch, tmp_path):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "reflection:\n  provider: openclaw\n", encoding="utf-8")
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    rc = active_bridge._reflection_cfg()
+    assert rc["provider"] == "openclaw"
+    assert rc["window"] == "22:00"   # 默认被保留
+
+
+def test_reflection_endpoint_reports_latest(monkeypatch, tmp_path):
+    import asyncio
+    d = tmp_path / "reflections"
+    d.mkdir()
+    (d / "2026-08-13.md").write_text("今天更懂你了\n", encoding="utf-8")
+    monkeypatch.setattr(active_bridge.reflection, "REFLECTIONS_DIR", d)
+    out = asyncio.run(active_bridge.reflection_get())
+    assert out["latest"]["date"] == "2026-08-13"
+    assert out["latest"]["first_line"] == "今天更懂你了"

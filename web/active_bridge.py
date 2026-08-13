@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
-                    motivation, emoji_matcher, injector)
+                    motivation, emoji_matcher, injector, reflection)
 
 log = logging.getLogger("web.active")
 
@@ -51,6 +51,17 @@ def _heartbeat_loop():
                 _on_window(card)
                 st2 = state_machine.on_active_sent(nxt, c)
                 state_store.save(st2, STATE)
+            rc = _reflection_cfg()
+            if reflection.should_reflect(rc, nxt, now=datetime.now()):
+                content = life_content.load_content(CONTENT)
+                journal = life_journal.read_journal()
+                day = str(datetime.now().date())
+                card = reflection.build_reflection_card(content, journal, day)
+                reflection.inject_reflection_card(
+                    card, provider=rc.get("provider", "dry_run"))
+                st3 = state_store.load(STATE)
+                reflection.mark_reflected(st3, day)
+                state_store.save(st3, STATE)
         except Exception:            # noqa: BLE001 — 心跳绝不被异常打断
             log.exception("heartbeat tick failed")
         time.sleep(c["tick_minutes"] * 60)
@@ -76,6 +87,17 @@ def _active_cfg() -> dict:
         except yaml.YAMLError:
             c = {}
     return cfgmod.merge_config(c)
+
+
+def _reflection_cfg() -> dict:
+    raw = {}
+    if CFG.is_file():
+        try:
+            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
+                "reflection") or {}
+        except yaml.YAMLError:
+            raw = {}
+    return cfgmod.merge_reflection_config(raw)
 
 
 def register_active(app):
@@ -200,3 +222,20 @@ async def emoji_resolve(emotion: str = "", keyword: str = "",
         out["image"] = emoji_matcher.resolve_image(
             kw, cfg.get("emoji_sources") or ["adesk", "sogou"])
     return out
+
+
+@router.get("/reflection")
+async def reflection_get():
+    return {"latest": reflection.latest_reflection()}
+
+
+@router.post("/reflection/trigger")
+async def reflection_trigger():
+    """手动触发一次反思请求（试跑）：拼卡 → inject（默认 dry_run）。验证用。"""
+    content = life_content.load_content(CONTENT)
+    journal = life_journal.read_journal()
+    day = str(datetime.now().date())
+    card = reflection.build_reflection_card(content, journal, day)
+    res = reflection.inject_reflection_card(
+        card, provider=_reflection_cfg().get("provider", "dry_run"))
+    return {"card": card, "inject": res}
