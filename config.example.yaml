@@ -30,3 +30,23 @@ reflection:
   window: "22:00"
   # 注入方式：dry_run 只拼不写；openclaw 写进 girl_workspace/memory/reflect.md
   provider: dry_run
+
+# ============ 作息漂移（双向，内驱优先） ============
+circadian:
+  bedtime: "23:00"        # 基础就寝（会漂）
+  wake: "08:00"           # 基础起床（会漂）
+  # 她今天自己忙了很多事(own_load)→ 今晚想早睡；你半夜还在聊 → 睡得晚；
+  # 你说"好累先睡了" → 她跟着早睡。晚班优先于早班。
+  # early_bedtime: "21:00"   # 早睡目标
+  # late_band_end: "03:00"   # 深夜带末尾
+  # max_shift_min: 240       # 单次最大漂移（分）
+
+# ============ 叙事日记（夜间记忆链路） ============
+diary:
+  enabled: true
+  provider: dry_run       # openclaw → 写 girl_workspace/memory/diary_in.md，由小语真写日记
+
+# ============ 梦记（非每日，夜间记忆链路） ============
+dream:
+  enabled: true
+  provider: dry_run       # openclaw → 写 girl_workspace/memory/dream_in.md，由小语忆昨夜之梦

@@ -164,6 +164,17 @@ python -m uvicorn web.main:app --port 18780
 
 打开 http://127.0.0.1:18780（后台细节见 `web/README.md`）
 
+**换一台机器跑**：Python 后端是自包含的，**不依赖 OpenClaw / 微信 / 本机数据**即可启动。新机器上：
+
+```bash
+git clone <本仓库> && cd girl
+pip install -r requirements.txt        # 用根目录这份即可（web/ 目录的为旧副本）
+cp config.example.yaml data/config.yaml   # 首次生成运行态配置（不复制则用默认值）
+python -m uvicorn web.main:app --port 18780
+```
+
+没有任何 `data/`、`girl_workspace/memory/` 甚至 OpenClaw 时也能干净启动：所有 provider 回落 `dry_run`（零发送）、会话读取优雅返回空、摄入目录按需自建。配了 OpenClaw 才需要 `~\.openclaw\`（会话读取 + girl 工作区）。
+
 ### 3. 主动行为（V1.5）
 
 heartbeat 每 15 分钟推进一次状态（`tick_minutes`）；当**全部守卫放行**（阈值/能量/勿扰/冷却/每日上限/未回上限）时才可能主动开口。想试运行、看她会说什么而不真发：保持默认 `dry_run`，在后台「她的一天」点「现在就推」看卡片。想让小语真开口，把 `data/config.yaml` 的 provider 翻成 `openclaw`：
