@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import agent_admin, soul_render
 from .active_bridge import register_active
+from active import memgraph
 
 BASE = Path(__file__).resolve().parent
 PERSONALITY_YAML = BASE / "personality.yaml"
@@ -145,6 +146,12 @@ async def get_memory():
     sessions = agent_admin.list_sessions()
     total = sum(len(s.get("messages", [])) for s in sessions)
     return {"sessions": sessions, "total_messages": total}
+
+
+@app.get("/api/memory-graph")
+async def get_memory_graph():
+    """记忆图谱（读侧投影）：扫 girl 记忆文件 → {nodes, edges}。纯本地只读。"""
+    return memgraph.build_graph(memgraph.find_sources())
 
 
 # ============ 状态 ============
