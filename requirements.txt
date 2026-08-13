@@ -6,4 +6,6 @@
 fastapi==0.110.0
 uvicorn[standard]==0.27.1
 jinja2==3.1.3
-pyyaml==6.0.1
+# pyyaml>=6.0.1（放宽下限：Python 3.14 无 6.0.1 预编译轮子，需更高版 cp314 wheel，
+#  且让 pip 优先装带二进制的版本，避免在无 MSVC 的机器上现编译 _yaml C 扩展）
+pyyaml>=6.0.1,<7
