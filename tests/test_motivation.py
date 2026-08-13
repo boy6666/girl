@@ -45,3 +45,18 @@ def test_card_char_mode_appends_emoji_line():
     state = {"energy": 80, "mood": 0.6}
     card = build_motivation_card(state, {}, "", "2026-08-12", emoji_mode="char")
     assert "【表情】" in card
+
+
+def test_card_image_mode_appends_local_image_path():
+    state = {"energy": 80, "mood": 0.6}
+    card = build_motivation_card(state, {}, "", "2026-08-13", emoji_mode="image",
+                                 emoji_resolver=lambda kw: ("C:/media/meme_1.jpg", None))
+    assert "【表情】图=C:/media/meme_1.jpg" in card
+    assert "message(action=send" in card
+
+
+def test_card_image_mode_omits_line_when_download_fails():
+    state = {"energy": 80, "mood": 0.6}
+    card = build_motivation_card(state, {}, "", "2026-08-13", emoji_mode="image",
+                                 emoji_resolver=lambda kw: (None, None))
+    assert "【表情】" not in card
