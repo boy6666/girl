@@ -66,3 +66,23 @@ def test_resolve_image_falls_back_to_sogou(monkeypatch):
 def test_resolve_image_all_down_returns_none(monkeypatch):
     monkeypatch.setattr(em, "_http_get_json", lambda *a, **k: None)
     assert em.resolve_image("开心") is None
+
+
+def test_resolve_image_file_downloads_and_writes(tmp_path, monkeypatch):
+    monkeypatch.setattr(em, "_http_get_json", _fake_adesk)          # 复用既有的 fake 返回 URL
+    monkeypatch.setattr(em, "_http_get_bytes",
+                        lambda url, headers, timeout: b"\x89PNG-fake-bytes")
+    p = em.resolve_image_file("开心", str(tmp_path))
+    assert p is not None and p.startswith(str(tmp_path))
+    written = list(tmp_path.iterdir())
+    assert len(written) == 1 and written[0].read_bytes() == b"\x89PNG-fake-bytes"
+
+def test_resolve_image_file_none_when_download_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(em, "_http_get_json", _fake_adesk)
+    monkeypatch.setattr(em, "_http_get_bytes", lambda url, headers, timeout: None)
+    assert em.resolve_image_file("开心", str(tmp_path)) is None
+    assert list(tmp_path.iterdir()) == []            # 不落任何文件
+
+def test_resolve_image_file_none_when_no_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(em, "_http_get_json", lambda url, headers, timeout: None)
+    assert em.resolve_image_file("开心", str(tmp_path)) is None

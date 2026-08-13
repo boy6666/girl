@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import csv
 import json
+import re
+import time
 import urllib.parse
 import urllib.request
 from functools import lru_cache
@@ -140,6 +142,15 @@ def _http_get_json(url: str, headers: dict, timeout: float = 12.0) -> dict | Non
         return None
 
 
+def _http_get_bytes(url: str, headers: dict, timeout: float = 12.0) -> bytes | None:
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read()
+    except Exception:
+        return None
+
+
 def _extract(data: dict | None, provider: str) -> str | None:
     if not data:
         return None
@@ -169,3 +180,29 @@ def resolve_image(keyword: str, sources: list[str] | None = None,
         if img:
             return {"url": img, "provider": name}
     return None
+
+
+_IMG_EXT = re.compile(r"\.(png|jpe?g|gif|webp)(?:\?|$)", re.I)
+
+
+def resolve_image_file(keyword: str, out_dir: str, sources: list[str] | None = None,
+                       timeout: float = 12.0) -> str | None:
+    """解析稳定图源→下载一张表情图到 out_dir，返回本地绝对路径；任一环节失败返回 None。"""
+    hit = resolve_image(keyword, sources, timeout)
+    if not hit:
+        return None
+    data = _http_get_bytes(hit["url"], {"User-Agent": "Mozilla/5.0"}, timeout)
+    if not data:
+        return None
+    folder = Path(out_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    m = _IMG_EXT.search(hit["url"] or "")
+    ext = m.group(1).lower().replace("jpeg", "jpg") if m else "jpg"
+    base = int(time.time())
+    f = folder / f"meme_{base}.{ext}"
+    counter = 1
+    while f.exists():                       # 同秒冲突兜底
+        f = folder / f"meme_{base}_{counter}.{ext}"
+        counter += 1
+    f.write_bytes(data)
+    return str(f.resolve())
