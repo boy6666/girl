@@ -12,11 +12,14 @@ active_behavior:
 
   # --- 表情包语义匹配（②） ---
   emoji_mode: off        # off | char | image
+  #  off  : 关闭表情出口（默认）
   #  char : 按本地标注数据集(EmoTag/Emoji Sentiment Ranking)→ 1 个 emoji 字符。
   #         纯文本、嵌套在同一条消息里、微信原生渲染、零发送成本。
-  #  image: 按情绪/关键词调稳定图源 API → 表情图 URL（真发图需先接真/开 IMAGE 通道）。
-  #  off  : 关闭表情出口（默认，接真前保持现状）。
+  #  image: 状态机开窗时真的抓一张表情图 → 下载到 data/media/ → girl 微信真发表情包
+  #         （默认单发表情包本身，图里有字；需要时她可前后配一句。回滚=翻回 off）
   emoji_sources:
     - adesk      # 稳定 JSON 图源：so.picasso.adesk.com（推荐首选）
     - sogou      # 稳定 JSON 图源：image.sogou.com/napi/wap/pic（fallback）
+  emoji_media_dir: data/media       # 本地表情包文件夹（gitignored 运行态）
+  emoji_media_ttl_days: 14          # 旧图自动清理（天）
   # 想自挂图源：改 active/emoji_matcher.py 的 SOURCES 条目，或在此覆盖 providers。

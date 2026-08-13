@@ -199,6 +199,8 @@ heartbeat 每 15 分钟推进一次状态（`tick_minutes`）；当**全部守�
 
 - **字符出口（char）**：数据来自 `data/emoji/`（EmoTag 150 表情×8 情绪 + Emoji Sentiment Ranking 751 表情×极性，本地自用 ~第三方数据集，gitignored）。状态机 mood/energy → 情绪 → 在 EmoTag 按情绪分取榜首、用 ESR 极性 tie-break，**只出 1 个**（反 AI 腔「一个就够」）。数据集缺失自动降级到内置兜底表，不崩。
 - **图源出口（image）**：稳定 JSON 图源两个（均实测）：`adesk`（`so.picasso.adesk.com`）、`sogou`（`image.sogou.com/napi/wap/pic`），多源顺序 fallback。其余（doutula/fabiaoqing 等）是 HTML 抓取、实测不稳，**未收录**。
+- **image 真发图**：`emoji_mode: image` 时，窗口一开 Python 会从稳定图源抓一张表情图、下载到本地「表情包文件夹」`data/media/`（gitignored），把**本地路径**写进动机卡片；girl 心跳读到后想发就用 `message(action=send, path=...)` 真发。**默认只发表情包本身**（表情包里已有文字），需要时她可在前/后配一句。图片默认单发、由小语判断；图源失败自动退回纯文字主动，不崩。回滚 = `emoji_mode` 翻回 `off`。
+- **本地文件夹**：`data/media/` 自动建，旧图按 `emoji_media_ttl_days`（默认 14 天）自动清理。
 - **配置**：`emoji_mode`（off/char/image）+ `emoji_sources`（图源列表）。改完重启后台生效。想自挂图源：补 `active/emoji_matcher.py` 的 `SOURCES` 条目，或在此覆盖 providers。
 - **试跑**：后台 `GET /api/active/emoji/resolve?emotion=开心&mode=char`（或带 `mode=image`）看解析结果——全程 dry-run，不真发。
 - image 出口**只解析到 URL**，不发图；真发图走单一出口（OpenClaw），先接真再切 `image`。
