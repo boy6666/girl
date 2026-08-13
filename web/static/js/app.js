@@ -23,6 +23,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
         if (page === 'status') loadStatus();
         if (page === 'active') loadActive();
         if (page === 'life') loadLife();
+        if (page === 'memgraph') loadMemGraph();
     });
 });
 

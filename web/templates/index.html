@@ -15,6 +15,7 @@
             <a class="nav-item" data-page="active" href="#"><span class="icon">⚙️</span>主动状态机</a>
             <a class="nav-item" data-page="life" href="#"><span class="icon">🌸</span>她的一天</a>
             <a class="nav-item" data-page="memory" href="#"><span class="icon">🧠</span>记忆</a>
+            <a class="nav-item" data-page="memgraph" href="#"><span class="icon">🕸️</span>记忆图谱</a>
             <a class="nav-item" data-page="files" href="#"><span class="icon">📄</span>人格文件</a>
             <a class="nav-item" data-page="behavior" href="#"><span class="icon">🤖</span>行为</a>
             <a class="nav-item" data-page="status" href="#"><span class="icon">📊</span>状态</a>
@@ -70,6 +71,13 @@
             <div class="memory-list" id="memory-list"><p class="loading">加载中…</p></div>
         </section>
 
+        <!-- 记忆图谱 -->
+        <section class="page" id="page-memgraph">
+            <h1>记忆图谱</h1>
+            <p class="description">她记得你的什么、记得哪些主题——从她的记忆文件抽出来的投影。悬停看原文与日期，可拖拽。读侧只读，不改她的记忆。</p>
+            <div id="memgraph-canvas"><p class="loading">加载中…</p></div>
+        </section>
+
         <!-- 人格文件 -->
         <section class="page" id="page-files">
             <h1>人格文件</h1>
@@ -100,5 +108,6 @@
 </div>
 
 <script src="/static/js/app.js"></script>
+<script src="/static/js/memgraph.js"></script>
 </body>
 </html>
