@@ -30,3 +30,19 @@ def test_load_config_returns_merged_defaults(tmp_path):
 def test_load_config_missing_file_uses_defaults():
     out = cfg.load_config(Path("definitely/missing.yaml"))
     assert out["emoji_media_dir"] == "data/media"
+
+
+def test_reflection_defaults_and_override():
+    from active import config as c
+    assert c.load_reflection_config.__name__
+    assert c.REFLECTION_DEFAULTS == {
+        "enabled": True, "window": "22:00", "provider": "dry_run"}
+    merged = c.merge_reflection_config({"provider": "openclaw", "bogus": 1})
+    assert merged["provider"] == "openclaw"
+    assert merged["window"] == "22:00"      # 未知键被忽略
+
+
+def test_load_reflection_config_missing_file_defaults():
+    from active import config as c
+    merged = c.merge_reflection_config({})
+    assert merged["enabled"] is True and merged["provider"] == "dry_run"

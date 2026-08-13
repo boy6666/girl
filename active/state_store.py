@@ -17,6 +17,7 @@ def default_state(now: datetime | None = None) -> dict:
         "last_active_ts": None,
         "unanswered_count": 0,
         "today_active_count": 0,
+        "last_reflection_date": None,    # 上次反思日期 YYYY-MM-DD（防每晚重复）
         "today": now.strftime("%Y-%m-%d"),
         "awaiting_reply": False,
     }

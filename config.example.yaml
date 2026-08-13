@@ -23,3 +23,10 @@ active_behavior:
   emoji_media_dir: data/media       # 本地表情包文件夹（gitignored 运行态）
   emoji_media_ttl_days: 14          # 旧图自动清理（天）
   # 想自挂图源：改 active/emoji_matcher.py 的 SOURCES 条目，或在此覆盖 providers。
+
+# ============ 反思（V3 自我反思） ============
+reflection:
+  # 每晚反思窗口（24h，避开主动开窗/勿扰时段）
+  window: "22:00"
+  # 注入方式：dry_run 只拼不写；openclaw 写进 girl_workspace/memory/reflect.md
+  provider: dry_run

@@ -21,3 +21,10 @@ def test_save_roundtrip(tmp_path):
     p = tmp_path / "state.json"
     state_store.save(state_store.default_state(datetime(2026, 8, 11)), p)
     assert state_store.load(p)["today"] == "2026-08-11"
+
+
+def test_default_state_has_last_reflection_date():
+    from active import state_store
+    d = state_store.default_state()
+    assert "last_reflection_date" in d
+    assert d["last_reflection_date"] is None

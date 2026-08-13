@@ -49,3 +49,34 @@ def load_config(cfg_path: Path | None = None) -> dict:
     except Exception:
         raw = {}
     return merge_config(raw)
+
+
+# ===== 反思（V3 自我反思）参数 =====
+REFLECTION_DEFAULTS = {
+    "enabled": True,             # 是否每晚反思
+    "window": "22:00",           # 每晚窗口 HH:MM（24h），避开主动开窗
+    "provider": "dry_run",       # dry_run | openclaw（openclaw 才写 reflect.md）
+}
+
+
+def merge_reflection_config(raw: dict | None = None) -> dict:
+    cfg = dict(REFLECTION_DEFAULTS)
+    if raw:
+        for k, v in raw.items():
+            if k in cfg:
+                cfg[k] = v
+    return cfg
+
+
+def load_reflection_config(cfg_path: Path | None = None) -> dict:
+    """读 data/config.yaml 的顶层 reflection 段并 merge 默认。"""
+    path = cfg_path or (Path(__file__).resolve().parents[1] / "data" / "config.yaml")
+    raw = {}
+    try:
+        import yaml
+        with path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        raw = data.get("reflection") or {}
+    except Exception:
+        raw = {}
+    return merge_reflection_config(raw)
