@@ -80,3 +80,94 @@ def load_reflection_config(cfg_path: Path | None = None) -> dict:
     except Exception:
         raw = {}
     return merge_reflection_config(raw)
+
+
+# ===== 作息（circadian）—— 她有自己的生活节奏，可由当天忙碌/相处双向漂移 =====
+CIRCADIAN_DEFAULTS = {
+    "bedtime": "23:00",          # 基础就寝 HH:MM
+    "wake": "08:00",             # 基础起床 HH:MM
+    "early_bedtime": "21:00",    # 内驱/早睡时的就寝下限（最早就寝）
+    "late_band_end": "03:00",    # 晚睡深夜带上界（从他聊到就寝后算起，跨午夜）
+    "max_shift_min": 240,        # 最多同时后延/前移（分钟，4h）
+    "own_load_min_per_item": 20, # 她今天每件真实事压早就寝的分钟数
+}
+
+
+def merge_circadian_config(raw: dict | None = None) -> dict:
+    cfg = dict(CIRCADIAN_DEFAULTS)
+    if raw:
+        for k, v in raw.items():
+            if k in cfg:
+                cfg[k] = v
+    return cfg
+
+
+def load_circadian_config(cfg_path: Path | None = None) -> dict:
+    path = cfg_path or (Path(__file__).resolve().parents[1] / "data" / "config.yaml")
+    raw = {}
+    try:
+        import yaml
+        with path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        raw = data.get("circadian") or {}
+    except Exception:
+        raw = {}
+    return merge_circadian_config(raw)
+
+
+# ===== 日记（每晚·她第一人称叙事） =====
+DIARY_DEFAULTS = {
+    "enabled": True,             # 是否每晚写日记
+    "provider": "dry_run",       # dry_run | openclaw（openclaw 才写 diary_in.md）
+}
+
+
+def merge_diary_config(raw: dict | None = None) -> dict:
+    cfg = dict(DIARY_DEFAULTS)
+    if raw:
+        for k, v in raw.items():
+            if k in cfg:
+                cfg[k] = v
+    return cfg
+
+
+def load_diary_config(cfg_path: Path | None = None) -> dict:
+    path = cfg_path or (Path(__file__).resolve().parents[1] / "data" / "config.yaml")
+    raw = {}
+    try:
+        import yaml
+        with path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        raw = data.get("diary") or {}
+    except Exception:
+        raw = {}
+    return merge_diary_config(raw)
+
+
+# ===== 梦（非每日·真实日间残余做由头） =====
+DREAM_DEFAULTS = {
+    "enabled": True,             # 是否做非每日的梦
+    "provider": "dry_run",       # dry_run | openclaw（openclaw 才写 dream_in.md）
+}
+
+
+def merge_dream_config(raw: dict | None = None) -> dict:
+    cfg = dict(DREAM_DEFAULTS)
+    if raw:
+        for k, v in raw.items():
+            if k in cfg:
+                cfg[k] = v
+    return cfg
+
+
+def load_dream_config(cfg_path: Path | None = None) -> dict:
+    path = cfg_path or (Path(__file__).resolve().parents[1] / "data" / "config.yaml")
+    raw = {}
+    try:
+        import yaml
+        with path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        raw = data.get("dream") or {}
+    except Exception:
+        raw = {}
+    return merge_dream_config(raw)

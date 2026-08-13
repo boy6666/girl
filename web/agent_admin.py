@@ -144,3 +144,16 @@ def count_messages() -> int:
     for sess in list_sessions():
         total += len(sess.get("messages", []))
     return total
+
+
+def latest_user_contact() -> dict | None:
+    """读侧：最近一条真实用户消息 {ts, text}。作息漂移的真实锚。
+
+    零写、零发送、只读会话。无会话/读失败 → None（回退基础作息，不崩、不造假）。
+    """
+    for sess in list_sessions():
+        msgs = sess.get("messages") or []
+        for m in reversed(msgs):          # 最近的会话最新消息优先
+            if m.get("role") == "user" and m.get("text"):
+                return {"ts": m.get("ts"), "text": m["text"]}
+    return None

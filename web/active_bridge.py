@@ -12,7 +12,9 @@ from fastapi.responses import JSONResponse
 
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
-                    motivation, emoji_matcher, injector, reflection)
+                    motivation, emoji_matcher, injector, reflection,
+                    circadian, diary, dream)
+from . import agent_admin
 
 log = logging.getLogger("web.active")
 
@@ -62,6 +64,7 @@ def _heartbeat_loop():
                 st3 = state_store.load(STATE)
                 reflection.mark_reflected(st3, day)
                 state_store.save(st3, STATE)
+            _tick_nightly_memory(datetime.now())
         except Exception:            # noqa: BLE001 — 心跳绝不被异常打断
             log.exception("heartbeat tick failed")
         time.sleep(c["tick_minutes"] * 60)
@@ -98,6 +101,106 @@ def _reflection_cfg() -> dict:
         except yaml.YAMLError:
             raw = {}
     return cfgmod.merge_reflection_config(raw)
+
+
+def _circadian_cfg() -> dict:
+    raw = {}
+    if CFG.is_file():
+        try:
+            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
+                "circadian") or {}
+        except yaml.YAMLError:
+            raw = {}
+    return cfgmod.merge_circadian_config(raw)
+
+
+def _diary_cfg() -> dict:
+    raw = {}
+    if CFG.is_file():
+        try:
+            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
+                "diary") or {}
+        except yaml.YAMLError:
+            raw = {}
+    return cfgmod.merge_diary_config(raw)
+
+
+def _dream_cfg() -> dict:
+    raw = {}
+    if CFG.is_file():
+        try:
+            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
+                "dream") or {}
+        except yaml.YAMLError:
+            raw = {}
+    return cfgmod.merge_dream_config(raw)
+
+
+def _parse_contact_dt(ts):
+    """把会话时间戳（epoch 秒/毫秒 或 ISO 串）解析成 datetime；无 → None。"""
+    if ts is None or isinstance(ts, bool):
+        return None
+    try:
+        if isinstance(ts, (int, float)):
+            if abs(ts) > 1e12:      # 毫秒
+                ts = ts / 1000.0
+            return datetime.fromtimestamp(ts)
+        if isinstance(ts, str):
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except (TypeError, ValueError, OSError):
+        return None
+    return None
+
+
+def _current_schedule(now: datetime | None = None) -> dict:
+    """用今天的真实素材（她忙多少 + 最近会话的晚/早信号）折算今晩作息。读侧、零写。"""
+    now = now or datetime.now()
+    day = now.strftime("%Y-%m-%d")
+    content = life_content.load_content(CONTENT)
+    cc = _circadian_cfg()
+    contact = agent_admin.latest_user_contact()
+    dtc = _parse_contact_dt(contact.get("ts") if contact else None)
+    last_clock = (dtc.hour * 60 + dtc.minute) if dtc else None
+    wind_down = bool(contact and circadian.is_wind_down(contact.get("text"))
+                     and dtc and dtc.date().isoformat() == day)
+    sched = circadian.schedule(
+        cc["bedtime"], cc["wake"],
+        own_load=circadian.own_load(content, day),
+        last_contact_clock=last_clock, wind_down=wind_down,
+        early_bedtime=cc["early_bedtime"], late_band_end=cc["late_band_end"],
+        max_shift_min=cc["max_shift_min"],
+        own_load_min_per_item=cc["own_load_min_per_item"])
+    return {"config": cc, "schedule": sched,
+            "inputs": {"own_load": circadian.own_load(content, day),
+                       "last_contact_clock": last_clock, "wind_down": wind_down}}
+
+
+def _tick_nightly_memory(now: datetime | None = None) -> None:
+    """日记 + 梦两路（每晚就该寝写日记，今早该起床后忆昨夜之梦）。无副作用时各自跳过。"""
+    now = now or datetime.now()
+    day = now.strftime("%Y-%m-%d")
+    content = life_content.load_content(CONTENT)
+    journal = life_journal.read_journal()
+    sch = _current_schedule(now)
+
+    dc = _diary_cfg()
+    if diary.should_diary(dc, state_store.load(STATE), now=now, bedtime=sch["schedule"]["bedtime"]):
+        card = diary.build_diary_card(content, journal, day, now)
+        res = diary.inject_diary_card(card, provider=dc.get("provider", "dry_run"))
+        if res.get("written"):
+            st = state_store.load(STATE)
+            diary.mark_diary(st, day)
+            state_store.save(st, STATE)
+
+    dm = _dream_cfg()
+    if dream.should_dream(dm, state_store.load(STATE), now=now, wake=sch["schedule"]["wake"]):
+        card = dream.build_dream_card(content, journal, day, now)
+        if card:                                # 非梦夜/无真实残余 → None → 不做、不造假
+            res = dream.inject_dream_card(card, provider=dm.get("provider", "dry_run"))
+            if res.get("written"):
+                st = state_store.load(STATE)
+                dream.mark_dream(st, day)
+                state_store.save(st, STATE)
 
 
 def register_active(app):
@@ -262,4 +365,78 @@ async def reflection_trigger():
     card = reflection.build_reflection_card(content, journal, day)
     res = reflection.inject_reflection_card(
         card, provider=_reflection_cfg().get("provider", "dry_run"))
+    return {"card": card, "inject": res}
+
+
+# ---------- 作息 / 日记 / 梦（夜间记忆链路） ----------
+
+def _set_nightly_seg(block: str, payload: dict, allowed: tuple = ("enabled", "provider")) -> None:
+    data = {}
+    if CFG.is_file():
+        try:
+            data = yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            data = {}
+    seg = dict(data.get(block) or {})
+    for k in allowed:
+        if k in payload:
+            seg[k] = payload[k]
+    data[block] = seg
+    CFG.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+                   encoding="utf-8")
+
+
+@router.get("/circadian")
+async def circadian_get():
+    """作息配置 + 今天折算后的就寝/起床（读侧）。"""
+    return _current_schedule()
+
+
+@router.get("/diary")
+async def diary_get():
+    return {"config": _diary_cfg(), "status": diary.diary_status(_diary_cfg()),
+            "latest": diary.latest_diary()}
+
+
+@router.post("/diary/config")
+async def diary_config_set(payload: dict):
+    _set_nightly_seg("diary", payload)
+    cfg = _diary_cfg()
+    return {"config": cfg, "status": diary.diary_status(cfg)}
+
+
+@router.post("/diary/trigger")
+async def diary_trigger():
+    """手动写一次日记请求（试跑）：拼卡 → inject（遵守 provider，默认 dry_run）。"""
+    content = life_content.load_content(CONTENT)
+    journal = life_journal.read_journal()
+    day = str(datetime.now().date())
+    card = diary.build_diary_card(content, journal, day)
+    res = diary.inject_diary_card(card, provider=_diary_cfg().get("provider", "dry_run"))
+    return {"card": card, "inject": res}
+
+
+@router.get("/dream")
+async def dream_get():
+    return {"config": _dream_cfg(), "status": dream.dream_status(_dream_cfg()),
+            "latest": dream.latest_dream()}
+
+
+@router.post("/dream/config")
+async def dream_config_set(payload: dict):
+    _set_nightly_seg("dream", payload)
+    cfg = _dream_cfg()
+    return {"config": cfg, "status": dream.dream_status(cfg)}
+
+
+@router.post("/dream/trigger")
+async def dream_trigger():
+    """手动做一次梦请求（试跑）：拼卡 → inject。非梦夜/无真实残余 → 不造假返回 None。"""
+    content = life_content.load_content(CONTENT)
+    journal = life_journal.read_journal()
+    day = str(datetime.now().date())
+    card = dream.build_dream_card(content, journal, day)
+    if card is None:
+        return {"card": None, "note": "今天不逢梦夜或昨夜没有真实由头——不做梦（不造假）"}
+    res = dream.inject_dream_card(card, provider=_dream_cfg().get("provider", "dry_run"))
     return {"card": card, "inject": res}
