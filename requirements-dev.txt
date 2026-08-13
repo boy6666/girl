@@ -1,0 +1,7 @@
+# ============ 开发 / 测试依赖（可选；跑服务不需要） ============
+# 测试 = 同步函数 + asyncio.run()，不用 pytest-asyncio。
+# httpx 仅供 starlette TestClient（test_fresh_boot.py）使用。
+
+-r requirements.txt
+pytest>=8
+httpx>=0.24
