@@ -226,7 +226,31 @@ async def emoji_resolve(emotion: str = "", keyword: str = "",
 
 @router.get("/reflection")
 async def reflection_get():
-    return {"latest": reflection.latest_reflection()}
+    """反思链路状态：最近反思 + 配置 + 接真状态（两个开关一起决定是否全自动）。"""
+    cfg = _reflection_cfg()
+    return {"latest": reflection.latest_reflection(),
+            "config": cfg,
+            "status": reflection.reflection_status(cfg)}
+
+
+@router.post("/reflection/config")
+async def reflection_config_set(payload: dict):
+    """让用户在后台自己决定两个开关：enabled（每晚反思）/ provider（dry_run|openclaw）。"""
+    data = {}
+    if CFG.is_file():
+        try:
+            data = yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            data = {}
+    seg = dict(data.get("reflection") or {})
+    for k in ("enabled", "window", "provider"):
+        if k in payload:
+            seg[k] = payload[k]
+    data["reflection"] = seg
+    CFG.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+                   encoding="utf-8")
+    cfg = _reflection_cfg()
+    return {"config": cfg, "status": reflection.reflection_status(cfg)}
 
 
 @router.post("/reflection/trigger")

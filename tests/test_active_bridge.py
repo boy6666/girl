@@ -1,6 +1,8 @@
 """test_active_bridge.py — 自动主动窗口的注入契约：读 inject_provider 配置。
 默认 dry_run 无副作用；翻成 openclaw 时只写心跳文件、sent 恒 False（单一出口）。
 """
+import yaml
+
 from active import injector
 from web import active_bridge
 
@@ -74,3 +76,35 @@ def test_reflection_endpoint_reports_latest(monkeypatch, tmp_path):
     out = asyncio.run(active_bridge.reflection_get())
     assert out["latest"]["date"] == "2026-08-13"
     assert out["latest"]["first_line"] == "今天更懂你了"
+
+
+def test_reflection_get_reports_status_and_config(monkeypatch, tmp_path):
+    import asyncio
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("reflection:\n  provider: openclaw\n", encoding="utf-8")
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    out = asyncio.run(active_bridge.reflection_get())
+    assert out["status"]["live"] is True
+    assert out["config"]["provider"] == "openclaw"
+
+
+def test_reflection_config_set_toggles_provider(monkeypatch, tmp_path):
+    import asyncio
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("reflection:\n  provider: dry_run\n", encoding="utf-8")
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    out = asyncio.run(active_bridge.reflection_config_set({"provider": "openclaw"}))
+    assert out["status"]["live"] is True
+    assert out["config"]["provider"] == "openclaw"
+    written = (yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}).get("reflection")
+    assert written["provider"] == "openclaw"
+
+
+def test_reflection_config_set_disables(monkeypatch, tmp_path):
+    import asyncio
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("reflection:\n  provider: openclaw\n", encoding="utf-8")
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    out = asyncio.run(active_bridge.reflection_config_set({"enabled": False}))
+    assert out["status"]["live"] is False
+    assert out["status"]["state"] == "paused"

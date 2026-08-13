@@ -173,16 +173,68 @@ async function loadStatus() {
             ['agents', data.agents.join(' / '), 'girl 绑定微信'],
             ['girl 会话', data.girl_agent.sessions + ' 个 / ' + data.girl_agent.messages + ' 条', data.girl_agent.workspace],
         ];
-        let latest = null;
-        try { latest = (await (await fetch('/api/active/reflection')).json()).latest; } catch (e) {}
+        let ref = null;
+        try { ref = await (await fetch('/api/active/reflection')).json(); } catch (e) {}
+        const latest = ref && ref.latest;
         cards.push(['反思', latest ? latest.date : '—',
                     latest ? latest.first_line : '尚无反思——今晚她会回头看看']);
         document.getElementById('status-cards').innerHTML = cards.map(([k, v, sub]) => `
             <div class="status-card"><h3>${k}</h3>
                 <div class="status-big">${v}</div><div class="status-sub">${sub}</div>
             </div>`).join('');
+        if (ref) renderReflectionLink(ref);
     } catch (e) {
         showToast('加载状态失败');
+    }
+}
+
+// ============ 反思链路开关（两个开关都开 = 全自动） ============
+function renderReflectionLink(ref) {
+    const cfg = ref.config || {};
+    const st = ref.status || {};
+    const panel = document.getElementById('reflection-link-panel');
+    if (!panel) return;
+    const stateLabel = st.state === 'live' ? '已接真 · 每晚自动反思'
+        : st.state === 'paused' ? '反思已暂停'
+        : '试跑中 · 未接真（不会每晚自动反思）';
+    const color = st.state === 'live' ? '#22c55e' : '#f59e0b';
+    panel.innerHTML = `
+        <h3 style="margin:0 0 6px;">反思链路 <span style="color:${color}">● ${stateLabel}</span></h3>
+        <p class="description" style="margin-bottom:12px;">${escapeHtml(st.hint || '')}</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <label class="beh" style="flex:1;min-width:180px;">
+                <span>开关一 · 每晚反思（enabled）</span>
+                <select id="rl-enabled">
+                    <option value="true" ${cfg.enabled ? 'selected' : ''}>开</option>
+                    <option value="false" ${!cfg.enabled ? 'selected' : ''}>关</option>
+                </select>
+            </label>
+            <label class="beh" style="flex:1;min-width:180px;">
+                <span>开关二 · 注入方式（provider）</span>
+                <select id="rl-provider">
+                    <option value="dry_run" ${cfg.provider === 'dry_run' ? 'selected' : ''}>试跑（只拼不写）</option>
+                    <option value="openclaw" ${cfg.provider === 'openclaw' ? 'selected' : ''}>接真（写 reflect.md）</option>
+                </select>
+            </label>
+        </div>
+        <button class="btn-ghost" onclick="saveReflectionConfig()">保存这两个开关</button>`;
+}
+
+async function saveReflectionConfig() {
+    const payload = {
+        enabled: document.getElementById('rl-enabled').value === 'true',
+        provider: document.getElementById('rl-provider').value,
+    };
+    try {
+        const res = await (await fetch('/api/active/reflection/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })).json();
+        showToast(res.status.live ? '✓ 已接真：每晚自动反思' : '设置已保存（未接真）');
+        renderReflectionLink({ config: res.config, status: res.status });
+    } catch (e) {
+        showToast('保存反思开关失败');
     }
 }
 

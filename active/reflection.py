@@ -64,6 +64,33 @@ def mark_reflected(state: dict, day: str) -> dict:
     return state
 
 
+def reflection_status(cfg: dict) -> dict:
+    """把反思配置翻译成「接真状态」。两个开关共同决定是否全自动：
+
+    - `enabled`（是否每晚反思）
+    - `provider`（dry_run 只拼不写 / openclaw 真写 reflect.md）
+
+    都给用户看明白、由用户自己决定；纯函数、可测。
+    """
+    enabled = bool(cfg.get("enabled", True))
+    provider = cfg.get("provider", "dry_run")
+    window = cfg.get("window", DEFAULT_WINDOW)
+    live = enabled and provider == "openclaw"
+    if not enabled:
+        state = "paused"
+        hint = "反思已暂停：她不会收到每晚的反思请求，记忆不会再积累新的反思。"
+    elif provider != "openclaw":
+        state = "dry_run"
+        hint = ("注入在试跑：请求卡只拼出来、不真写进 reflect.md，所以每晚不会自动反思。"
+                "要接真，把注入方式设为 openclaw。")
+    else:
+        state = "live"
+        hint = ("已接真：每晚这段窗口请求卡会写进 reflect.md，她心跳读到就写进自己的记忆。"
+                "整链路自动需 web 后台(18780)保持开着 + 网关 girl 心跳在跑。")
+    return {"enabled": enabled, "provider": provider, "window": window,
+            "state": state, "live": live, "hint": hint}
+
+
 def inject_reflection_card(card: str, provider: str = "dry_run",
                            path: Path | None = None) -> dict:
     """把反思请求卡交给 girl。单一出口约束：写文件 ≠ 发微信，sent 恒 False。"""

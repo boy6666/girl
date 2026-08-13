@@ -88,3 +88,27 @@ def test_latest_reflection(monkeypatch, tmp_path):
     got = reflection.latest_reflection()
     assert got["date"] == "2026-08-13"
     assert got["first_line"] == "今天更懂你了"
+
+
+def test_reflection_status_live_when_enabled_and_openclaw():
+    st = reflection.reflection_status({"enabled": True, "provider": "openclaw", "window": "22:00"})
+    assert st["live"] is True and st["state"] == "live"
+
+
+def test_reflection_status_paused_when_disabled():
+    st = reflection.reflection_status({"enabled": False, "provider": "openclaw"})
+    assert st["live"] is False and st["state"] == "paused"
+    assert "暂停" in st["hint"]
+
+
+def test_reflection_status_dry_run_by_default():
+    st = reflection.reflection_status({})
+    assert st["live"] is False and st["state"] == "dry_run"
+    assert st["provider"] == "dry_run"
+    assert "openclaw" in st["hint"]       # 提醒怎么接真
+
+
+def test_reflection_status_dry_run_not_live_even_when_enabled():
+    st = reflection.reflection_status({"enabled": True, "provider": "dry_run"})
+    assert st["live"] is False and st["state"] == "dry_run"
+    assert "不会" in st["hint"]

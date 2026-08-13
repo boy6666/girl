@@ -53,7 +53,7 @@
 | **生活模拟** | 小时段生活底色 + 非每日的日间残余梦境；动机卡片【现在】【今天】【昨天】【梦】【状态】——只讲真实发生的，不现编模板 |
 | **Web 后台** | 人格调参 / 记忆可视化 / 主动状态机（三环仪表+参数滑块）/ 她的一天（生活底色编辑 + 「长一条」+「推一次」）/ 状态 |
 | **成长** | 生活日志 `data/life_journal.md`，grow 按她真实生活底色生长当天记录 |
-| **反思（V3）** | 每晚/重要对话后自我抽离地复盘：命名情绪、纳进「你和我」的叙事、可靠洞见升长期记忆。默认 `reflection.provider: dry_run`（只拼诉求注入），翻 `openclaw` 由小语写进 `memory/reflections/`。产物内化、零发送 |
+| **反思（V3）** | 每晚/重要对话后自我抽离地复盘：命名情绪、纳进「你和我」的叙事、可靠洞见升长期记忆。默认 `reflection.provider: dry_run`（只拼诉求注入），翻 `openclaw` 由小语写进 `memory/reflections/`。产物内化、零发送。后台状态页有「反思链路」面板：开关一 `enabled` + 开关二 `provider` 两个都开 = 每晚自动接真，未开则白字提醒你接线 |
 | **记忆图谱（V3）** | 读侧投影：把她记忆文件（USER/MEMORY/日记/反思/生活日志）抽成人物-主题-记忆点，Web 台轻量 SVG 力导向展示；提及你的必连中心「你」。零写、零发送、纯本地 |
 | **表情（②）** | 情绪/关键词 → 表情：字符出口（本地标注数据集 + 1 个 emoji 字符）或图源出口（adesk/sogou 稳定 API → 表情图 URL）；默认 `off` |
 
@@ -107,7 +107,7 @@ girl/
 │   ├── templates/ static/  #   前端
 │   └── README.md           #   后台使用说明
 ├── girl_workspace/         # OpenClaw girl agent 工作区（人格/规则/心跳钩子）
-├── tests/                  # 97 个测试（pytest）
+├── tests/                  # 104 个测试（pytest）
 ├── data/                   # 运行态：config.yaml / state.json / 生活 / 日志（本地）
 └── app/, main.py           # （旧自研引擎，已由 OpenClaw 接管的占位）
 ```
@@ -218,7 +218,7 @@ heartbeat 每 15 分钟推进一次状态（`tick_minutes`）；当**全部守�
 ## 测试
 
 ```bash
-python -m pytest        # 97 passed
+python -m pytest        # 104 passed
 ```
 
 ---
