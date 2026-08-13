@@ -1,4 +1,6 @@
 """config.py — 主动状态机全部参数（唯一真相，落点 data/config.yaml 的 active_behavior 段）。"""
+from pathlib import Path
+
 CONFIG_DEFAULTS = {
     "open_threshold": 0.5,           # 社交需求达到多少才考虑开窗
     "cooldown_seconds": 300,         # 主动冷却（秒）
@@ -21,6 +23,8 @@ CONFIG_DEFAULTS = {
     "inject_provider": "dry_run",    # dry_run | openclaw（真注入见 Task 14）
     "emoji_mode": "off",                    # off | char | image — 表情出口；image 需接真后再启用
     "emoji_sources": ["adesk", "sogou"],    # image 模式的稳定图源，可自配
+    "emoji_media_dir": "data/media",        # 本地表情包文件夹（相对仓库根，gitignored）
+    "emoji_media_ttl_days": 14,             # 旧图自动清理（天）
 }
 
 
@@ -31,3 +35,17 @@ def merge_config(raw: dict | None = None) -> dict:
             if k in cfg:
                 cfg[k] = v
     return cfg
+
+
+def load_config(cfg_path: Path | None = None) -> dict:
+    """读 data/config.yaml 的 active_behavior 段并 merge 默认；缺文件/异常→纯默认。"""
+    path = cfg_path or (Path(__file__).resolve().parents[1] / "data" / "config.yaml")
+    raw = {}
+    try:
+        import yaml
+        with path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        raw = data.get("active_behavior") or {}
+    except Exception:
+        raw = {}
+    return merge_config(raw)
