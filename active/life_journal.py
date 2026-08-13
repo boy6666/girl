@@ -44,3 +44,11 @@ def recent_entries_from_text(text: str, n: int = 1) -> list[str]:
 def last_entry_date(path: Path = JOURNAL_PATH) -> str | None:
     entries = _parse_entries(read_journal(path))
     return entries[-1][0] if entries else None
+
+
+def entry_for_date(text: str, day: str) -> str:
+    """返回指定日期的日志正文；没有该日条目 → ''。"""
+    for d, b in _parse_entries(text):
+        if d == day:
+            return b.strip()
+    return ""
