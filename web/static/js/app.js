@@ -172,6 +172,10 @@ async function loadStatus() {
             ['agents', data.agents.join(' / '), 'girl 绑定微信'],
             ['girl 会话', data.girl_agent.sessions + ' 个 / ' + data.girl_agent.messages + ' 条', data.girl_agent.workspace],
         ];
+        let latest = null;
+        try { latest = (await (await fetch('/api/active/reflection')).json()).latest; } catch (e) {}
+        cards.push(['反思', latest ? latest.date : '—',
+                    latest ? latest.first_line : '尚无反思——今晚她会回头看看']);
         document.getElementById('status-cards').innerHTML = cards.map(([k, v, sub]) => `
             <div class="status-card"><h3>${k}</h3>
                 <div class="status-big">${v}</div><div class="status-sub">${sub}</div>
@@ -342,6 +346,14 @@ async function nudgeNow() {
             `卡片:\n${j.card}\n\n注入: ${j.inject.provider} · sent=${j.inject.sent}`;
         showToast(j.inject.sent ? '（真的被推了一次）' : '试跑：卡片已生成，未真发');
     } catch (e) { showToast('推送失败'); }
+}
+
+async function reflectNow() {
+    try {
+        const r = await (await fetch('/api/active/reflection/trigger', { method: 'POST' })).json();
+        document.getElementById('reflect-preview').textContent = (r.card || '');
+        showToast('已试跑反思请求（不真发）');
+    } catch (e) { showToast('反思试跑失败'); }
 }
 
 // ============ 工具 ============

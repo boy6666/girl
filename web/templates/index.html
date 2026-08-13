@@ -91,6 +91,10 @@
             <h1>状态</h1>
             <p class="description">后台视角的小语接线状态。网关/模型深层健康请用命令行 <code>openclaw status</code>。</p>
             <div class="status-cards" id="status-cards"></div>
+            <div style="margin-top:18px;">
+                <button class="btn-ghost" onclick="reflectNow()">现在就反思（试跑·不真发）</button>
+                <pre id="reflect-preview" class="preview-box" style="min-height:70px;"></pre>
+            </div>
         </section>
     </main>
 </div>
