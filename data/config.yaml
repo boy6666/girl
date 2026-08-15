@@ -1,93 +1,69 @@
-# AI Girlfriend Bot - 配置文件
-# 此文件存储所有可调参数，请通过Web后台修改或直接编辑
-
-# ============ 人格参数 ============
 personality:
-  # 甜度：0(冷淡) - 100(甜蜜)
   sweetness: 65
-  # 高冷度：0(热情) - 100(高冷)
   coolness: 30
-  # 主动阈值：触发主动消息的概率基数 (0-100)
   initiative_threshold: 50
-  # 情绪波动：回复情绪的变化幅度 (0-100)
   mood_volatility: 45
-  # 幽默度：使用幽默/俏皮回复的概率 (0-100)
   humor: 55
-
-# ============ 主动状态机（V1.5） ============
 active_behavior:
-  # 社交需求达到多少才考虑开窗
   open_threshold: 0.5
-  # 主动冷却（秒）
   cooldown_seconds: 300
-  # 每日主动上限（次）
   daily_max: 2
-  # 勿扰硬墙：绝不在这些时辰主动
   quiet_start: 2
   quiet_end: 5
-  # 连续未回上限（达到暂停催人）
   max_unanswered: 3
-  # 是否允许凌晨/深夜软窗口
   allow_late_night: true
   late_night_start: 23
   early_morning_end: 6
-  # 心跳间隔（分钟）
   tick_minutes: 15
-  # 思念涨速（每小时基数）
   growth_rate_per_hour: 0.12
-  # 精力漂移常数（4h） / 情绪回基线常数（6h） / 情绪基线
   energy_time_constant_min: 240
   mood_time_constant_min: 360
   mood_baseline: 0.15
-  # 依恋类型：secure | anxious | avoidant
   attachment: secure
-  # 种子状态（首次 tick 填入）
   seed_energy: 80.0
   seed_mood: 0.2
-  # 生长/注入方式：dry_run 试跑（不上真）；openclaw 真接线（Task 14）
-  grow_provider: dry_run
-  inject_provider: dry_run
-
-# ============ 记忆系统 ============
+  grow_provider: openclaw
+  inject_provider: openclaw
+  emoji_mode: image
 memory:
-  # 上下文保留轮数
   context_turns: 10
-  # 记忆摘要最大长度
   summary_max_length: 200
-  # 相似度阈值
   similarity_threshold: 0.7
-  # 每日记忆上限
   daily_memory_limit: 50
-
-# ============ AI 模型配置 ============
 ai:
-  # 云端对话模型
-  chat_model: "deepseek-chat"
-  chat_api_base: "https://api.deepseek.com/v1"
-  # chat_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  # DeepSeek 免费额度用完时切换
-  # chat_model: "qwen-plus"
-
-  # 本地推理（记忆提取）
-  local_model: "qwen2.5:1.5b"
-  local_api_base: "http://localhost:11434"
-
-  # Embedding 模型
-  embedding_model: "nomic-embed-text"
-
-# ============ 微信配置 ============
+  chat_model: deepseek-chat
+  chat_api_base: https://api.deepseek.com/v1
+  local_model: qwen2.5:1.5b
+  local_api_base: http://localhost:11434
+  embedding_model: nomic-embed-text
+reflection:
+  window: '22:00'
+  provider: openclaw
 wechat:
-  # 微信协议版本（需与微信版本匹配）
-  protocol_version: "v3"
-  # 自动通过好友请求
+  protocol_version: v3
   auto_accept_friend: false
-  # 仅回复私聊
   private_only: true
-
-# ============ Web 服务 ============
 server:
-  host: "0.0.0.0"
+  host: 0.0.0.0
   port: 8000
   debug: false
-  # WebSocket刷新间隔（毫秒）
   ws_ping_interval: 30000
+setup:
+  girl:
+    name: 小语
+    relation: 主人的女朋友（知心女友型）
+    age: ''
+    birthday: ''
+    background: ''
+    core_personality: 有温度、有脾气、深爱主人；会陪伴、会哄人，也会闹小情绪。
+    positioning: 不是助手，是另一半；在微信里说话跟真实女友一样自然。
+  owner:
+    nickname: ''
+    age: ''
+    job: ''
+    schedule: ''
+    interests: ''
+    dislikes: ''
+    topics: ''
+    important: ''
+  init_mode: web_fill

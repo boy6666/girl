@@ -18,6 +18,9 @@
                 <a href="#" class="nav-item" data-page="personality">
                     <span class="icon">🎭</span> 人格调参
                 </a>
+                <a href="#" class="nav-item" data-page="setup">
+                    <span class="icon">🪪</span> 基础设定
+                </a>
                 <a href="#" class="nav-item" data-page="memory">
                     <span class="icon">🧠</span> 记忆管理
                 </a>
@@ -109,6 +112,27 @@
                 </div>
 
                 <button class="btn-save" onclick="savePersonality()">保存设置</button>
+            </section>
+
+            <!-- 页面：基础设定 -->
+            <section id="page-setup" class="page">
+                <h1>🪪 基础设定</h1>
+                <p class="description">给小语和她记得的“你”写起点基线。填好后写入 IDENTITY.md / USER.md，下一条消息生效。</p>
+
+                <!-- 初始化方式 -->
+                <h3>初始化方式</h3>
+                <div class="btn-row" id="setup-init" style="margin-bottom:20px;"></div>
+
+                <!-- 小语人设 -->
+                <h3>小语 · 人设（→ IDENTITY.md）</h3>
+                <div id="setup-girl" class="setup-grid"></div>
+
+                <!-- 主人资料 -->
+                <h3>主人 · 资料（→ USER.md）</h3>
+                <div id="setup-owner" class="setup-grid"></div>
+
+                <button class="btn-save" onclick="saveSetup()" style="margin-top:18px;">保存基础设定</button>
+                <pre id="setup-preview" class="setup-preview"></pre>
             </section>
 
             <!-- 页面：记忆管理 -->

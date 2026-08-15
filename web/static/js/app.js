@@ -17,6 +17,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.add('active');
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(`page-${page}`).classList.add('active');
+        if (page === 'setup') loadSetup();
         if (page === 'memory') loadMemory();
         if (page === 'files') loadFiles();
         if (page === 'behavior') loadBehavior();
@@ -79,6 +80,83 @@ async function loadPreview() {
         document.getElementById('soul-preview').textContent =
             idx === -1 ? res.content : res.content.slice(idx);
     } catch (e) { /* 忽略 */ }
+}
+
+// ============ 基础设定 ============
+const GIRL_FIELDS = [
+    ['name', '名字'], ['relation', '与主人的关系'], ['age', '年龄'],
+    ['birthday', '生日'], ['background', '背景故事'],
+    ['core_personality', '核心性格'], ['positioning', '定位'],
+];
+const OWNER_FIELDS = [
+    ['nickname', '怎么称呼'], ['age', '年龄'], ['job', '职业'], ['schedule', '作息'],
+    ['interests', '兴趣爱好'], ['dislikes', '不喜欢的事'],
+    ['topics', '聊得来的话题'], ['important', '重要的事 / 约定 / 时刻'],
+];
+let SETUP = { girl: {}, owner: {}, init_mode: 'web_fill' };
+
+async function loadSetup() {
+    try {
+        SETUP = await (await fetch('/api/setup')).json();
+    } catch (e) { showToast('加载基础设定失败'); return; }
+    // 初始化方式（单选按钮组）
+    const modes = [
+        ['wechat_ask', '微信一步步问', '让 AI 在微信里自然地问你关于你的事，慢慢了解你'],
+        ['web_fill', '已在 Web 填好', '资料已在下面填好，AI 照着认识你，不再反复问你'],
+    ];
+    document.getElementById('setup-init').innerHTML = modes.map(([v, label, desc]) => `
+        <label class="setup-mode ${SETUP.init_mode === v ? 'chosen' : ''}" data-v="${v}">
+            <input type="radio" name="setup-init-mode" value="${v}"
+                ${SETUP.init_mode === v ? 'checked' : ''} onchange="pickInitMode('${v}')">
+            <strong>${label}</strong>
+            <span class="setup-mode-desc">${desc}</span>
+        </label>`).join('');
+    renderSetupBlock('setup-girl', GIRL_FIELDS, SETUP.girl, 'girl');
+    renderSetupBlock('setup-owner', OWNER_FIELDS, SETUP.owner, 'owner');
+    renderSetupPreview();
+}
+
+function renderSetupBlock(elId, fields, values, prefix) {
+    document.getElementById(elId).innerHTML = fields.map(([key, label]) => `
+        <label class="beh"><span>${label}</span>
+            <input id="su-${prefix}-${key}" value="${escapeHtml(values[key] ?? '')}"></label>
+    `).join('');
+}
+
+function pickInitMode(v) {
+    SETUP.init_mode = v;
+    document.querySelectorAll('#setup-init .setup-mode').forEach(el =>
+        el.classList.toggle('chosen', el.dataset.v === v));
+    renderSetupPreview();
+}
+
+function collectSetup() {
+    SETUP.girl = Object.fromEntries(GIRL_FIELDS.map(([k]) => [k, document.getElementById(`su-girl-${k}`).value]));
+    SETUP.owner = Object.fromEntries(OWNER_FIELDS.map(([k]) => [k, document.getElementById(`su-owner-${k}`).value]));
+    return SETUP;
+}
+
+function renderSetupPreview() {
+    const pre = document.getElementById('setup-preview');
+    if (!pre) return;
+    const mode = SETUP.init_mode === 'wechat_ask'
+        ? '微信一步步问：AI 会在相处里自然地问你关于你的事，慢慢了解你。'
+        : '已在 Web 填好：AI 照着下方资料认识你，不再反复问你。';
+    pre.textContent = `📌 初始化方式：${mode}`;
+}
+
+async function saveSetup() {
+    const payload = collectSetup();
+    try {
+        const res = await (await fetch('/api/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })).json();
+        SETUP = res;
+        showToast(`✓ 基础设定已保存，已写入 ${res.written.join(' / ')}，下条消息生效`);
+        renderSetupPreview();
+    } catch (e) { showToast('保存失败'); }
 }
 
 // ============ 记忆 ============

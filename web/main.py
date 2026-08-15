@@ -21,7 +21,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import agent_admin, soul_render
+from . import agent_admin, setup as setup_mod, soul_render
 from .active_bridge import register_active
 from active import memgraph
 
@@ -152,6 +152,21 @@ async def get_memory():
 async def get_memory_graph():
     """记忆图谱（读侧投影）：扫 girl 记忆文件 → {nodes, edges}。纯本地只读。"""
     return memgraph.build_graph(memgraph.find_sources())
+
+
+# ============ 基础设定 ============
+
+@app.get("/api/setup")
+async def get_setup():
+    """小语人设 + 主人资料 + 初始化方式（读回数据源）。"""
+    return setup_mod.load(BEHAVIOR_YAML)
+
+
+@app.post("/api/setup")
+async def set_setup(payload: dict):
+    """保存并重写 IDENTITY.md / USER.md（下条消息生效）。"""
+    saved = setup_mod.save(BEHAVIOR_YAML, payload)
+    return {"success": True, **saved}
 
 
 # ============ 状态 ============
