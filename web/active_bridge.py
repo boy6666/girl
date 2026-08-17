@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
                     motivation, emoji_matcher, injector, reflection,
-                    circadian, diary, dream, life_init)
+                    circadian, diary, dream, life_init, growth)
 from . import agent_admin
 
 log = logging.getLogger("web.active")
@@ -65,6 +65,7 @@ def _heartbeat_loop():
                 reflection.mark_reflected(st3, day)
                 state_store.save(st3, STATE)
             _tick_nightly_memory(datetime.now())
+            _tick_growth(datetime.now())
         except Exception:            # noqa: BLE001 — 心跳绝不被异常打断
             log.exception("heartbeat tick failed")
         time.sleep(c["tick_minutes"] * 60)
@@ -126,6 +127,25 @@ def _diary_cfg() -> dict:
 
 
 def _init_cfg() -> dict:
+    raw = {}
+    if CFG.is_file():
+        try:
+            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
+                "init") or {}
+        except yaml.YAMLError:
+            raw = {}
+    return {"provider": raw.get("provider", "dry_run")}
+
+
+def _growth_cfg() -> dict:
+    raw = {}
+    if CFG.is_file():
+        try:
+            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
+                "growth") or {}
+        except yaml.YAMLError:
+            raw = {}
+    return cfgmod.merge_growth_config(raw)
     raw = {}
     if CFG.is_file():
         try:
@@ -212,6 +232,22 @@ def _tick_nightly_memory(now: datetime | None = None) -> None:
                 st = state_store.load(STATE)
                 dream.mark_dream(st, day)
                 state_store.save(st, STATE)
+
+
+def _tick_growth(now: datetime | None = None) -> None:
+    """持续生长：低频率（interval_days）在 GROWTH.md 底子上续长。有真实料才问，没长就不催。"""
+    now = now or datetime.now()
+    st = state_store.load(STATE)
+    gc = _growth_cfg()
+    if not growth.should_grow(gc, st, now=now):
+        return
+    if st.get("last_growth_date"):
+        card = growth.build_growth_card_from_store()
+        if card:                                # 无真实沉淀 → 不问、不现编
+            growth.inject_growth_card(card, provider=gc.get("provider", "dry_run"))
+            st = state_store.load(STATE)
+            growth.mark_grown(st, now.strftime("%Y-%m-%d"))
+            state_store.save(st, STATE)
 
 
 def register_active(app):
@@ -484,3 +520,31 @@ async def init_status_trigger():
     res = life_init.inject_init_request(
         card, provider=_init_cfg().get("provider", "dry_run"))
     return {"card": card, "inject": res, "target_age": target}
+
+
+# ---------- 持续生长（在 GROWTH.md 底子上续长） ----------
+
+@router.get("/growth")
+async def growth_get():
+    return {"config": _growth_cfg(), "status": growth.growth_status(_growth_cfg())}
+
+
+@router.post("/growth/config")
+async def growth_config_set(payload: dict):
+    _set_nightly_seg("growth", payload,
+                     allowed=("enabled", "interval_days", "provider"))
+    cfg = _growth_cfg()
+    return {"config": cfg, "status": growth.growth_status(cfg)}
+
+
+@router.post("/growth/trigger")
+async def growth_trigger():
+    """手动想看一张今天拼的续长卡：仅试跑（遵守 provider）。没料 → 卡空, 不现编。"""
+    st = state_store.load(STATE)
+    if not st.get("initialized") or not st.get("last_growth_date"):
+        st = growth.mark_grown(st, None)
+    card = growth.build_growth_card_from_store()
+    if not card:
+        return {"card": None, "note": "这段时间没有真实沉淀(反思/承诺·缺席) → 不现编, 她没长就是没长。"}
+    res = growth.inject_growth_card(card, provider=_growth_cfg().get("provider", "dry_run"))
+    return {"card": card, "inject": res}

@@ -285,11 +285,20 @@ async function loadStatus() {
         const latest = ref && ref.latest;
         cards.push(['反思', latest ? latest.date : '—',
                     latest ? latest.first_line : '尚无反思——今晚她会回头看看']);
+        let gr = null;
+        try { gr = await (await fetch('/api/active/growth')).json(); } catch (e) {}
+        if (gr && gr.config) {
+            cards.push(['持续生长', gr.status.state === 'live' ? '每' + (gr.config.interval_days || 3) + '天 / 接真'
+                        : gr.status.state === 'paused' ? '已暂停'
+                        : '试跑中',
+                    gr.status.live ? '有真实沉淀会续写 GROWTH.md' : '未接真 · 不会自动续写']);
+        }
         document.getElementById('status-cards').innerHTML = cards.map(([k, v, sub]) => `
             <div class="status-card"><h3>${k}</h3>
                 <div class="status-big">${v}</div><div class="status-sub">${sub}</div>
             </div>`).join('');
         if (ref) renderReflectionLink(ref);
+        loadGrowthPanel();
     } catch (e) {
         showToast('加载状态失败');
     }
@@ -343,6 +352,77 @@ async function saveReflectionConfig() {
     } catch (e) {
         showToast('保存反思开关失败');
     }
+}
+
+// ============ 持续生长（在 GROWTH.md 底子上续长） ============
+async function loadGrowthPanel() {
+    try {
+        const g = await (await fetch('/api/active/growth')).json();
+        renderGrowthLink(g);
+    } catch (e) { /* 后台未起则静默 */ }
+}
+
+function renderGrowthLink(g) {
+    const panel = document.getElementById('growth-link-panel');
+    if (!panel) return;
+    const cfg = g.config || {};
+    const st = g.status || {};
+    const stateLabel = st.state === 'live' ? '已接真 · 有真实沉淀会续写 GROWTH.md'
+        : st.state === 'paused' ? '持续生长已暂停'
+        : '试跑中 · 未接真（不会自动续写）';
+    const color = st.live ? '#22c55e' : '#f59e0b';
+    panel.innerHTML = `
+        <h3 style="margin:0 0 6px;">持续生长 <span style="color:${color}">● ${stateLabel}</span></h3>
+        <p class="description" style="margin-bottom:12px;">${escapeHtml(st.hint || '')}</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <label class="beh" style="flex:1;min-width:160px;">
+                <span>节奏（interval_days 天一次）</span>
+                <input id="gw-interval" type="number" min="1" value="${cfg.interval_days || 3}" style="padding:6px;">
+            </label>
+            <label class="beh" style="flex:1;min-width:180px;">
+                <span>注入方式（provider）</span>
+                <select id="gw-provider">
+                    <option value="dry_run" ${cfg.provider === 'dry_run' ? 'selected' : ''}>试跑（只拼不写）</option>
+                    <option value="openclaw" ${cfg.provider === 'openclaw' ? 'selected' : ''}>接真（写 growth_in.md）</option>
+                </select>
+            </label>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn-ghost" onclick="saveGrowthConfig()">保存持续生长</button>
+            <button class="btn-ghost" onclick="growthTrigger()">现在拼一张看看</button>
+        </div>
+        <pre id="growth-card-preview" class="preview-box" style="min-height:70px;margin-top:12px;"></pre>`;
+}
+
+async function saveGrowthConfig() {
+    const payload = {
+        interval_days: parseInt(document.getElementById('gw-interval').value, 10) || 3,
+        provider: document.getElementById('gw-provider').value,
+    };
+    try {
+        const res = await (await fetch('/api/active/growth/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })).json();
+        showToast(res.status.live ? '✓ 已接真：有真实沉淀会自动续长' : '设置已保存（未接真）');
+        renderGrowthLink({ config: res.config, status: res.status });
+    } catch (e) {
+        showToast('保存持续生长失败');
+    }
+}
+
+async function growthTrigger() {
+    const el = document.getElementById('growth-card-preview');
+    if (!el) return;
+    try {
+        const d = await (await fetch('/api/active/growth/trigger', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+        })).json();
+        el.textContent = d.card
+            ? `【此刻拼出的持续长成请求 · ${d.inject.provider}】\n\n${d.card}`
+            : (d.note || '');
+    } catch (e) { el.textContent = '拼卡失败'; }
 }
 
 // ============ 主动状态机 ============

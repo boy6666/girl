@@ -20,6 +20,7 @@ def default_state(now: datetime | None = None) -> dict:
         "last_reflection_date": None,    # 上次反思日期 YYYY-MM-DD（防每晚重复）
         "last_diary_date": None,         # 上次写日记日期（防每晚重复）
         "last_dream_date": None,         # 上次写梦记日期（防重复）
+        "last_growth_date": None,         # 上次"持续生长"提问日（低频，防每天催长）
         "today": now.strftime("%Y-%m-%d"),
         "awaiting_reply": False,
     }

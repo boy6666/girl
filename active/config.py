@@ -144,6 +144,36 @@ def load_diary_config(cfg_path: Path | None = None) -> dict:
     return merge_diary_config(raw)
 
 
+# ===== 持续生长（低频率·在 GROWTH.md 底子上续长） =====
+GROWTH_DEFAULTS = {
+    "enabled": True,             # 是否周期性问她"后来你又长成什么样"
+    "interval_days": 3,         # 几天才问一次（生长是慢的）
+    "provider": "dry_run",       # dry_run | openclaw（openclaw 才写 growth_in.md）
+}
+
+
+def merge_growth_config(raw: dict | None = None) -> dict:
+    cfg = dict(GROWTH_DEFAULTS)
+    if raw:
+        for k, v in raw.items():
+            if k in cfg:
+                cfg[k] = v
+    return cfg
+
+
+def load_growth_config(cfg_path: Path | None = None) -> dict:
+    path = cfg_path or (Path(__file__).resolve().parents[1] / "data" / "config.yaml")
+    raw = {}
+    try:
+        import yaml
+        with path.open(encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        raw = data.get("growth") or {}
+    except Exception:
+        raw = {}
+    return merge_growth_config(raw)
+
+
 # ===== 梦（非每日·真实日间残余做由头） =====
 DREAM_DEFAULTS = {
     "enabled": True,             # 是否做非每日的梦
