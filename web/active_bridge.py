@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
                     motivation, emoji_matcher, injector, reflection,
-                    circadian, diary, dream)
+                    circadian, diary, dream, life_init)
 from . import agent_admin
 
 log = logging.getLogger("web.active")
@@ -123,6 +123,17 @@ def _diary_cfg() -> dict:
         except yaml.YAMLError:
             raw = {}
     return cfgmod.merge_diary_config(raw)
+
+
+def _init_cfg() -> dict:
+    raw = {}
+    if CFG.is_file():
+        try:
+            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
+                "init") or {}
+        except yaml.YAMLError:
+            raw = {}
+    return {"provider": raw.get("provider", "dry_run")}
 
 
 def _dream_cfg() -> dict:
@@ -440,3 +451,36 @@ async def dream_trigger():
         return {"card": None, "note": "今天不逢梦夜或昨夜没有真实由头——不做梦（不造假）"}
     res = dream.inject_dream_card(card, provider=_dream_cfg().get("provider", "dry_run"))
     return {"card": card, "inject": res}
+
+
+# ---------- 自动初始化（从出生长到目标年龄） ----------
+
+@router.get("/init/status")
+async def init_status():
+    """GROWTH.md 长成状态 + 目标年龄 + 预览请求卡（读侧，不注入）。"""
+    from . import setup as setup_mod
+    from active import life_init
+    baseline = setup_mod.load(CFG)
+    target = life_init.resolve_target_age(baseline)
+    st = life_init.init_status()
+    st["target_age"] = target
+    st["card"] = life_init.frame_init_request(
+        baseline, target if target is not None else 22) if target else ""
+    return st
+
+
+@router.post("/init/trigger")
+async def init_status_trigger():
+    """手动触发一次自动初始化：按目标年龄拼成长请求卡 → inject（默认 dry_run）。"""
+    from . import setup as setup_mod
+    from active import life_init
+    baseline = setup_mod.load(CFG)
+    target = life_init.resolve_target_age(baseline)
+    if not target:
+        return {"card": None,
+                "inject": None, "target_age": None,
+                "note": "还没填目标年龄 → 不能凭空长成（不现编）。先在基础设定填小语年龄。"}
+    card = life_init.frame_init_request(baseline, target)
+    res = life_init.inject_init_request(
+        card, provider=_init_cfg().get("provider", "dry_run"))
+    return {"card": card, "inject": res, "target_age": target}

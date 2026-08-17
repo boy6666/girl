@@ -114,6 +114,7 @@ async function loadSetup() {
     renderSetupBlock('setup-girl', GIRL_FIELDS, SETUP.girl, 'girl');
     renderSetupBlock('setup-owner', OWNER_FIELDS, SETUP.owner, 'owner');
     renderSetupPreview();
+    loadInitStatus();
 }
 
 function renderSetupBlock(elId, fields, values, prefix) {
@@ -157,6 +158,34 @@ async function saveSetup() {
         showToast(`✓ 基础设定已保存，已写入 ${res.written.join(' / ')}，下条消息生效`);
         renderSetupPreview();
     } catch (e) { showToast('保存失败'); }
+}
+
+// ============ 自动初始化 ============
+async function loadInitStatus() {
+    const el = document.getElementById('setup-init-status');
+    if (!el) return;
+    try {
+        const d = await (await fetch('/api/active/init/status')).json();
+        el.textContent = d.initialized
+            ? `✅ ${d.note}\n\n--- 她已长成 ---\n${d.story}`
+            : (d.note || '');
+    } catch (e) { el.textContent = '（后台未起，读不到初始化状态）'; }
+}
+
+async function triggerInit() {
+    const el = document.getElementById('setup-init-status');
+    try {
+        const d = await (await fetch('/api/active/init/trigger', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+        })).json();
+        if (d.card) {
+            el.textContent = `【成长请求卡（目标 ${d.target_age} 岁）· ${d.inject.provider}】\n\n${d.card}\n\n→ ${d.inject.note || ''}`;
+            showToast('已生成成长请求（默认 dry_run，不真影响小语）');
+        } else {
+            el.textContent = d.note || '';
+            showToast(d.note || '还差目标年龄');
+        }
+    } catch (e) { showToast('触发初始化失败'); }
 }
 
 // ============ 记忆 ============

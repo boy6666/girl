@@ -53,6 +53,11 @@
 
             <button class="btn-save" onclick="saveSetup()" style="margin-top:18px;">保存基础设定</button>
             <pre id="setup-preview" class="setup-preview"></pre>
+
+            <h3>自动初始化</h3>
+            <p class="description">在小语人设里填好「年龄」作为目标年龄，让 girl agent 从出生长到她这个岁数：每段用 Erikson 心理社会发展阶段，长出成型的三观/价值观/怎么靠近人，写进 GROWTH.md。</p>
+            <div class="btn-save" onclick="triggerInit()" style="cursor:pointer;">🌱 自动初始化（从出生长到目标年龄）</div>
+            <pre id="setup-init-status" class="setup-preview"></pre>
         </section>
 
         <!-- 主动状态机 -->

@@ -214,3 +214,60 @@ def test_dream_trigger_dry_run_card(monkeypatch):
     out = asyncio.run(active_bridge.dream_trigger())
     assert out["card"] and "昨夜由头" in out["card"]
     assert out["inject"]["dry_run"] is True and out["inject"]["sent"] is False
+
+
+# ---- 自动初始化 ----
+
+def _init_cfg_file(cfg, age="22"):
+    cfg.write_text(f"setup:\n  girl:\n    name: 小语\n    age: '{age}'\n",
+                  encoding="utf-8")
+
+
+def test_init_status_honest_when_no_growth(monkeypatch, tmp_path):
+    import asyncio
+    cfg = tmp_path / "config.yaml"
+    _init_cfg_file(cfg)
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    monkeypatch.setattr(active_bridge.life_init, "_GROWTH_DEFAULT",
+                      tmp_path / "GROWTH.md")
+    out = asyncio.run(active_bridge.init_status())
+    assert out["initialized"] is False
+    assert out["target_age"] == 22
+
+
+def test_init_trigger_dry_run_no_file_side_effect(monkeypatch, tmp_path):
+    import asyncio
+    cfg = tmp_path / "config.yaml"
+    _init_cfg_file(cfg, age="22")
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    monkeypatch.setattr(active_bridge, "_init_cfg", lambda: {"provider": "dry_run"})
+    monkeypatch.setattr(active_bridge.life_init, "_INTAKE_DEFAULT",
+                      tmp_path / "INIT_INTAKE.md")
+    out = asyncio.run(active_bridge.init_status_trigger())
+    assert out["inject"]["dry_run"] is True
+    assert out["target_age"] == 22 and "22 岁" in out["card"]
+    assert not (tmp_path / "INIT_INTAKE.md").exists()   # dry_run 零副作用
+
+
+def test_init_trigger_openclaw_writes_intake(monkeypatch, tmp_path):
+    import asyncio
+    cfg = tmp_path / "config.yaml"
+    _init_cfg_file(cfg, age="22")
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    monkeypatch.setattr(active_bridge, "_init_cfg", lambda: {"provider": "openclaw"})
+    monkeypatch.setattr(active_bridge.life_init, "_INTAKE_DEFAULT",
+                      tmp_path / "INIT_INTAKE.md")
+    out = asyncio.run(active_bridge.init_status_trigger())
+    assert out["inject"]["written"] is True and out["inject"]["sent"] is False
+    assert (tmp_path / "INIT_INTAKE.md").is_file()
+
+
+def test_init_trigger_no_target_age_is_honest(monkeypatch, tmp_path):
+    import asyncio
+    cfg = tmp_path / "config.yaml"
+    _init_cfg_file(cfg, age="")
+    monkeypatch.setattr(active_bridge, "CFG", cfg)
+    monkeypatch.setattr(active_bridge, "_init_cfg", lambda: {"provider": "dry_run"})
+    out = asyncio.run(active_bridge.init_status_trigger())
+    assert out["card"] is None
+    assert "年龄" in out["note"]
