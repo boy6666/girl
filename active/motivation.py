@@ -51,7 +51,8 @@ def _emoji_suggestion(state: dict, mode: str, resolver) -> str:
 def build_motivation_card(state: dict, content: dict, journal: str, day: str,
                           now: datetime | None = None,
                           emoji_mode: str = "off",
-                          emoji_resolver=None) -> str:
+                          emoji_resolver=None,
+                          relations: dict | None = None) -> str:
     now = now or datetime.now()
     act = life_sim.current_activity(content, day, now.hour)
     highs = life_sim.today_highlights(content, day, now.hour)
@@ -67,6 +68,11 @@ def build_motivation_card(state: dict, content: dict, journal: str, day: str,
         lines.append(f"【昨天】{prev[0]}")
     if dream:
         lines.append(f"【梦】{dream}")
+    if relations:
+        from .relations import render_relations_summary
+        xs = render_relations_summary(relations)
+        if xs:
+            lines.append("【心事】" + xs)
     lines.append(f"【状态】{_state_words(state)}，有点想你，但我不必现在就说")
     hint = _emoji_suggestion(state, emoji_mode, emoji_resolver)
     if hint:

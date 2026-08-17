@@ -27,3 +27,22 @@ def test_dry_run_deterministic():
     a = lg.grow_today(_filled_content(), "", "2026-08-11", provider="dry_run", seed=7)
     b = lg.grow_today(_filled_content(), "", "2026-08-11", provider="dry_run", seed=7)
     assert a == b
+
+
+def test_motivation_card_adds_xinshi_only_when_real(monkeypatch):
+    from active import motivation
+    rel = {"promises": [{"text": "说好周三陪我", "made_on": "2026-08-10",
+                        "status": "broken"}],
+           "absences": [{"note": "这两天没怎么理我", "at": "2026-08-16"}]}
+    card = motivation.build_motivation_card(
+        {"energy": 60, "mood": 0.1}, {}, "", "2026-08-17",
+        emoji_mode="off", relations=rel)
+    assert "【心事】" in card and "这两天没怎么理我" in card
+
+
+def test_motivation_card_omits_xinshi_when_none():
+    from active import motivation
+    card = motivation.build_motivation_card(
+        {"energy": 60, "mood": 0.1}, {}, "", "2026-08-17",
+        emoji_mode="off", relations={"promises": [], "absences": []})
+    assert "【心事】" not in card
