@@ -4,6 +4,16 @@
 长出什么(信任/自主/同一性/亲密…)。由这些段拼"请求卡"交给 girl agent 一路生长,
 写进 GROWTH.md。代码不现编内容: 具体人生只有 agent 真生长/用户填的才算。
 """
+from pathlib import Path
+
+_INTAKE_DEFAULT = Path(__file__).resolve().parents[1] / "girl_workspace" / "INIT_INTAKE.md"
+_GROWTH_DEFAULT = Path(__file__).resolve().parents[1] / "girl_workspace" / "GROWTH.md"
+
+
+def read_growth_path() -> Path:
+    return _GROWTH_DEFAULT
+
+
 STAGES = [
     {"start": 0,  "end": 2,   "task": "信任 vs 不信任",  "grows": "她对世界的基本安全感、敢不敢信人"},
     {"start": 2,  "end": 6,   "task": "自主 vs 羞耻",     "grows": "她敢不敢自己做主、会不会怕丢脸"},
@@ -49,3 +59,35 @@ def frame_init_request(baseline: dict, target_age: int) -> str:
         lines.append(
             f"[{s['start']}~{s['end']}岁] {s['task']} —— 这一程长出: {s['grows']}")
     return "\n".join(lines) + "\n"
+
+
+def inject_init_request(card: str, provider: str = "dry_run",
+                     path: Path | None = None) -> dict:
+    """把成长请求卡交给摄入(dry_run 只打印)。openclaw 写 INIT_INTAKE.md。"""
+    if provider == "openclaw":
+        p = path or _INTAKE_DEFAULT
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(card.rstrip() + "\n", encoding="utf-8")
+        return {"provider": "openclaw", "sent": False, "written": True,
+                "path": str(p), "note": "已写入摄入文件, 由 girl agent 生长; 写回 GROWTH.md 才算成功"}
+    return {"provider": "dry_run", "dry_run": True, "sent": False,
+            "card": card, "note": "dry_run: 只产出请求, 未生长、未成功"}
+
+
+def read_life_story(growth_path: Path | None = None) -> str:
+    p = growth_path or _GROWTH_DEFAULT
+    if p.is_file():
+        try:
+            return p.read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
+    return ""
+
+
+def init_status(growth_path: Path | None = None) -> dict:
+    story = read_life_story(growth_path)
+    if story:
+        return {"initialized": True, "story": story,
+                "note": "已有 GROWTH.md: 她已经活到了目标年龄, 有成型的三观/人生。"}
+    return {"initialized": False, "story": "",
+            "note": "还没有 GROWTH.md: 还没真正长成人生(不编造; 触发初始化或直接在后台写 GROWTH.md)。"}

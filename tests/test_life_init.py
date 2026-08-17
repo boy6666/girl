@@ -30,3 +30,35 @@ def test_frame_init_request_never_claims_personhood_in_dry_run():
     from active import life_init as li
     card = li.frame_init_request({"girl": {"name": "小语", "age": "22"}}, 22)
     assert "GROWTH.md" in card
+
+
+def test_inject_init_dry_run_no_side_effect(tmp_path):
+    from active import life_init as li
+    p = tmp_path / "INIT_INTAKE.md"
+    r = li.inject_init_request("【请求】长到 22 岁", "dry_run", path=p)
+    assert r["dry_run"] is True and r["sent"] is False
+    assert not p.exists()
+
+
+def test_inject_init_openclaw_writes_intake(tmp_path):
+    from active import life_init as li
+    p = tmp_path / "INIT_INTAKE.md"
+    r = li.inject_init_request("【请求】长到 22 岁", "openclaw", path=p)
+    assert r["written"] is True and r["sent"] is False
+    assert "长到 22 岁" in p.read_text(encoding="utf-8")
+
+
+def test_init_status_honest_when_no_growth_yet(tmp_path):
+    from active import life_init as li
+    st = li.init_status(growth_path=tmp_path / "GROWTH.md")
+    assert st["initialized"] is False
+    assert "还没有" in st.get("note", "")
+
+
+def test_init_status_reads_growth_when_exists(tmp_path):
+    from active import life_init as li
+    gp = tmp_path / "GROWTH.md"
+    gp.write_text("# GROWTH.md\n我活到了 22 岁。\n", encoding="utf-8")
+    st = li.init_status(growth_path=gp)
+    assert st["initialized"] is True
+    assert "22 岁" in st["story"]
