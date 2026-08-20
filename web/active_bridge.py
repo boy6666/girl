@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
                     motivation, emoji_matcher, injector, reflection,
-                    circadian, diary, dream, life_init, growth)
+                    circadian, diary, dream, life_init, growth, send_feed)
 from . import agent_admin
 
 log = logging.getLogger("web.active")
@@ -40,8 +40,14 @@ def _heartbeat_loop():
     while True:
         try:
             c = _active_cfg()
-            st = state_store.load(STATE)
             init = state_store.default_state()
+            st = state_store.load(STATE)
+            # 先消费「发送日志」：__REPLY__（她回了）→ on_user_reply 解开未回闸；
+            # __SELF__（她真主动发了）→ on_active_sent 记主动。靠 girl 真实发出才记，
+            # 不靠后台"写了卡"就提前当主动发过。
+            st, kinds = send_feed.consume(st, c)
+            if kinds:
+                state_store.save(st, STATE)
             nxt = state_machine.tick(st if st.get("initialized") else init, c)
             state_store.save(nxt, STATE)
             if state_machine.should_open_window(nxt, c):
@@ -51,8 +57,6 @@ def _heartbeat_loop():
                     nxt, content, journal, str(datetime.now().date()),
                     emoji_mode=c.get("emoji_mode", "off"))
                 _on_window(card)
-                st2 = state_machine.on_active_sent(nxt, c)
-                state_store.save(st2, STATE)
             rc = _reflection_cfg()
             if reflection.should_reflect(rc, nxt, now=datetime.now()):
                 content = life_content.load_content(CONTENT)
@@ -280,6 +284,55 @@ async def set_config(payload: dict):
 @router.get("/state")
 async def get_state():
     return state_store.load(STATE)
+
+
+@router.post("/reply")
+async def on_reply(payload: dict | None = None):
+    """登记一次「你真回了」：清未回/断 awaiting/归零渴望并落库。
+    供 OpenClaw 侧真回时调用，也方便手动/测试解锁「未回未超限」闸。"""
+    quality = float((payload or {}).get("quality", 0.0) or 0.0)
+    c = _active_cfg()
+    st = state_store.load(STATE)
+    nxt = state_machine.on_user_reply(st, c, quality=quality)
+    state_store.save(nxt, STATE)
+    return {"ok": True,
+            "unanswered_count": nxt["unanswered_count"],
+            "awaiting_reply": nxt["awaiting_reply"],
+            "social_need": nxt["social_need"],
+            "last_real_reply": nxt["last_real_reply"]}
+
+
+@router.post("/sent")
+async def on_sent(payload: dict | None = None):
+    """登记一次「她真主动发了一条」：记主动/冷却/awaiting/耗精力并落库。
+    对应 send_feed 的 __SELF__；供 OpenClaw 侧真实主动发出时调用（也便于手动/测试）。"""
+    c = _active_cfg()
+    st = state_store.load(STATE)
+    nxt = state_machine.on_active_sent(st, c)
+    state_store.save(nxt, STATE)
+    return {"ok": True,
+            "today_active_count": nxt["today_active_count"],
+            "awaiting_reply": nxt["awaiting_reply"],
+            "last_active_ts": nxt["last_active_ts"],
+            "social_need": nxt["social_need"]}
+
+
+@router.get("/diag")
+async def get_diag():
+    """主动发送链路诊断：哪一环断了，为什么没发。
+    只读聚合 window_gates + 摄入文件 + 心跳线程存活。"""
+    from active import diag as diagmod
+    d = diagmod.proactive_diag(CFG, STATE)
+    alive = bool(_thread and _thread.is_alive())
+    d["python_heartbeat_alive"] = alive
+    d["python_heartbeat"] = {
+        "alive": alive,
+        "note": (
+            "Web 后台在跑，状态机每 %s 分钟推进一次、窗口开了就写卡片"
+            % d.get("tick_minutes") if alive else
+            "Web 后台没在跑 → 状态机从不推进 → 永远不会写动机卡片（先把 backend 跑起来）"),
+    }
+    return d
 
 
 @router.get("/life")

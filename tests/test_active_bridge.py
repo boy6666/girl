@@ -1,10 +1,59 @@
 """test_active_bridge.py — 自动主动窗口的注入契约：读 inject_provider 配置。
 默认 dry_run 无副作用；翻成 openclaw 时只写心跳文件、sent 恒 False（单一出口）。
 """
+import asyncio
+
 import yaml
 
 from active import injector
 from web import active_bridge
+
+
+def test_reply_endpoint_resets_await(monkeypatch, tmp_path):
+    """POST /api/active/reply 收到「真回」→ on_user_reply 清未回/断 awaiting 并落库。"""
+    from active import config as cfgmod
+    base = {
+        "initialized": True, "energy": 60.0, "mood": 0.2,
+        "social_need": 0.9, "today_active_count": 0,
+        "unanswered_count": 3, "awaiting_reply": True,
+        "last_real_reply": "2026-08-12T18:00:00",
+    }
+    saved = {}
+    monkeypatch.setattr(active_bridge, "_active_cfg",
+                        lambda: cfgmod.merge_config({}))
+    monkeypatch.setattr(active_bridge.state_store, "load",
+                        lambda path=None: dict(base))
+    monkeypatch.setattr(active_bridge.state_store, "save",
+                        lambda s, path=None: saved.update(s=s))
+    out = asyncio.run(active_bridge.on_reply({"quality": 0.0}))
+    assert out["awaiting_reply"] is False
+    assert out["unanswered_count"] == 0
+    assert saved["s"]["awaiting_reply"] is False
+    assert saved["s"]["unanswered_count"] == 0
+    assert saved["s"]["social_need"] == 0.0
+
+
+def test_sent_endpoint_records_proactive(monkeypatch):
+    """POST /api/active/sent 收到「她真主动发了」→ on_active_sent 记主动并落库。"""
+    from active import config as cfgmod
+    base = {
+        "initialized": True, "energy": 60.0, "mood": 0.2,
+        "social_need": 0.9, "today_active_count": 0,
+        "unanswered_count": 3, "awaiting_reply": True,
+        "last_real_reply": "2026-08-12T18:00:00",
+    }
+    saved = {}
+    monkeypatch.setattr(active_bridge, "_active_cfg",
+                        lambda: cfgmod.merge_config({}))
+    monkeypatch.setattr(active_bridge.state_store, "load",
+                        lambda path=None: dict(base))
+    monkeypatch.setattr(active_bridge.state_store, "save",
+                        lambda s, path=None: saved.update(s=s))
+    out = asyncio.run(active_bridge.on_sent({}))
+    assert out["today_active_count"] == 1
+    assert out["awaiting_reply"] is True
+    assert saved["s"]["today_active_count"] == 1
+    assert saved["s"]["social_need"] == 0.8        # 发≠被理，只小缓解
 
 
 def test_on_window_defaults_to_dry_run(monkeypatch):

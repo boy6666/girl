@@ -28,3 +28,12 @@ def test_default_state_has_last_reflection_date():
     d = state_store.default_state()
     assert "last_reflection_date" in d
     assert d["last_reflection_date"] is None
+
+
+def test_bond_persisted_across_save_load(tmp_path):
+    p = tmp_path / "state.json"
+    s = state_store.default_state(datetime(2026, 8, 11))
+    s.update({"bond": 42.0, "social_need": 0.7, "awaiting_reply": True})
+    state_store.save(s, p)
+    loaded = state_store.load(p)
+    assert loaded["bond"] == 42.0      # 关系羁绊必须持久化, 不能重载丢

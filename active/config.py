@@ -17,6 +17,17 @@ CONFIG_DEFAULTS = {
     "mood_time_constant_min": 360,   # 情绪回基线常数（6h）
     "mood_baseline": 0.15,           # 情绪基线
     "attachment": "secure",          # secure | anxious | avoidant
+    # ===== bond（羁绊/思念）—— 关系越深, 越忍不住想找他; 关系受威胁会灼烧 =====
+    "bond_start": 25.0,              # 初始羁绊
+    "bond_max": 100.0,               # 羁绊上限
+    "bond_grow_per_reply": 0.5,      # 每次被真回 + 的羁绊
+    "bond_thirst": 0.5,              # 羁绊放大思念涨速的上限倍乘 (bond/bond_max*此值)
+    "kept_promise_gain": 3.0,        # 他兑现承诺 → 羁绊 +
+    "broken_promise_drop": 8.0,      # 承诺落空 → 羁绊 -
+    "absence_drop": 6.0,             # 缺席 → 羁绊 -
+    "threat_spike": 0.35,            # 关系受威胁 → 渴望瞬间飙升(protest, 想去找他)
+    "kept_promise_mood": 0.1,        # 被兑现 → 情绪 +
+    "threat_mood_dip": 0.1,          # 被落空/缺席 → 情绪 -
     "seed_energy": 80.0,
     "seed_mood": 0.2,
     "grow_provider": "dry_run",      # dry_run | openclaw（真生长见 Task 14）

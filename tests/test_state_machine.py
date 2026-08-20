@@ -105,3 +105,73 @@ def test_active_sent_increments_and_relief():
     assert s1["energy"] < 80.0
     assert s1["awaiting_reply"] is True
     assert s1["last_active_ts"] is not None
+
+
+# ===================== bond 机制(羁绊/思念) =====================
+# 依恋理论: 真实回应/承诺兑现 → 安全基地, 羁绊绛; 缺席/承诺落空 → 关系受威胁,
+# 触发"求得亲近"(protest)→ 渴望被点燃, 她忍不住想去找他, 而不是干等。
+
+
+def test_bond_seeded_from_config_on_init():
+    s1 = sm.tick(base(), CFG, datetime(2026, 8, 11, 14, 0))
+    assert s1["bond"] == CFG["bond_start"]
+
+
+def test_bond_stays_in_range():
+    s1 = sm.tick(base(), CFG, datetime(2026, 8, 11, 14, 0))
+    assert 0 <= s1["bond"] <= CFG["bond_max"]
+
+
+def test_reply_grows_bond():
+    s = base(bond=50.0)
+    s1 = sm.tick(s, CFG, datetime(2026, 8, 11, 12, 0), reply_quality=0.5)
+    assert s1["bond"] == 50.0 + CFG["bond_grow_per_reply"]
+
+
+def test_bond_does_not_exceed_max_on_reply():
+    s = base(bond=99.9)
+    s1 = sm.tick(s, CFG, datetime(2026, 8, 11, 12, 0), reply_quality=0.5)
+    assert s1["bond"] <= CFG["bond_max"]
+
+
+def test_deeper_bond_yearns_faster():
+    t = datetime(2026, 8, 11, 12, 0)
+    lo = sm.tick(base(social_need=0.0, bond=5.0, last_real_reply="2026-08-11T10:00:00"), CFG, t)
+    hi = sm.tick(base(social_need=0.0, bond=90.0, last_real_reply="2026-08-11T10:00:00"), CFG, t)
+    assert hi["social_need"] > lo["social_need"]
+
+
+def test_kept_promise_raises_bond():
+    s1 = sm.apply_relation_event(base(bond=50.0), CFG, "kept_promise")
+    assert s1["bond"] == 50.0 + CFG["kept_promise_gain"]
+
+
+def test_broken_promise_lowers_bond_and_spikes_need():
+    s1 = sm.apply_relation_event(base(bond=50.0, social_need=0.3), CFG, "broken_promise")
+    assert s1["bond"] == 50.0 - CFG["broken_promise_drop"]
+    assert s1["social_need"] > 0.3
+
+
+def test_absence_lowers_bond_and_spikes_need():
+    s1 = sm.apply_relation_event(base(bond=50.0, social_need=0.3), CFG, "absence")
+    assert s1["bond"] == 50.0 - CFG["absence_drop"]
+    assert s1["social_need"] > 0.3
+
+
+def test_relation_threat_floor_at_zero_bond():
+    s1 = sm.apply_relation_event(base(bond=4.0), CFG, "broken_promise")
+    assert s1["bond"] >= 0.0
+
+
+def test_kept_promise_warms_mood_but_threat_dips_it():
+    k = sm.apply_relation_event(base(bond=50.0, mood=0.0), CFG, "kept_promise")
+    b = sm.apply_relation_event(base(bond=50.0, mood=0.2), CFG, "broken_promise")
+    assert k["mood"] > 0.0
+    assert b["mood"] < 0.2
+
+
+def test_bond_config_defaults_exist():
+    for k in ("bond_start", "bond_max", "bond_grow_per_reply", "bond_thirst",
+              "kept_promise_gain", "broken_promise_drop", "absence_drop",
+              "threat_spike"):
+        assert k in CFG, f"缺少配置默认值 {k}"

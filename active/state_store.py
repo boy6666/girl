@@ -13,6 +13,7 @@ def default_state(now: datetime | None = None) -> dict:
         "energy": None,              # 0~100
         "mood": None,                # -1~+1
         "social_need": 0.0,          # 0~1
+        "bond": None,                # 羁绊 0~100（关系深浅, 持久化不丢）
         "last_real_reply": None,     # iso 时间戳
         "last_active_ts": None,
         "unanswered_count": 0,

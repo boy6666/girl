@@ -1,0 +1,11 @@
+{
+  "id": "send-feed",
+  "name": "SendFeed Hook",
+  "description": "按触发源把她的每一条真实发送机械记进 send_feed.md（回他/主动），替掉'靠自觉写标记'",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

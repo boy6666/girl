@@ -298,6 +298,9 @@ async function loadStatus() {
                 <div class="status-big">${v}</div><div class="status-sub">${sub}</div>
             </div>`).join('');
         if (ref) renderReflectionLink(ref);
+        let diag = null;
+        try { diag = await (await fetch('/api/active/diag')).json(); } catch (e) {}
+        if (diag) renderActiveLink(diag);
         loadGrowthPanel();
     } catch (e) {
         showToast('加载状态失败');
@@ -334,6 +337,55 @@ function renderReflectionLink(ref) {
             </label>
         </div>
         <button class="btn-ghost" onclick="saveReflectionConfig()">保存这两个开关</button>`;
+}
+
+// ============ 主动发送链路诊断（为什么没自动发消息） ============
+function renderActiveLink(d) {
+    const panel = document.getElementById('active-link-panel');
+    if (!panel) return;
+    const py = d.python_heartbeat || {};
+    const win = d.window || {};
+    const hb = d.heartbeat_link || {};
+    const pyOn = !!py.alive;
+    const providerOn = (d.inject_provider || 'dry_run') === 'openclaw';
+    const cardIn = !!(d.heartbeat_link || {}).has_pending_card;
+    // 三层都好才算链路通
+    const linkOk = pyOn && win.open && providerOn;
+    const color = linkOk ? '#22c55e'
+                : (!pyOn || !providerOn) ? '#ef4444' : '#f59e0b';
+
+    const gateRows = (win.gates || []).map(g => `
+        <div style="display:flex;gap:8px;align-items:baseline;font-size:13px;padding:2px 0;">
+            <span style="color:${g.ok ? '#22c55e' : '#ef4444'};width:14px;">${g.ok ? '✓' : '✗'}</span>
+            <span style="min-width:92px;">${escapeHtml(g.gate)}</span>
+            <b style="min-width:44px;">${escapeHtml(g.value)}</b>
+            <span class="description" style="flex:1;">${escapeHtml(g.detail)} （要求 ${escapeHtml(g.limit)}）</span>
+        </div>`).join('');
+
+    panel.innerHTML = `
+        <h3 style="margin:0 0 6px;">主动发送链路 <span style="color:${color}">● ${
+            linkOk ? '链路通 · 会找机会开口' : '链路断 · 下面标红的是卡点'}</span></h3>
+        <p class="description" style="margin-bottom:10px;">三环缺一就不发：① 后台在跑、② 窗口开着、③ 有卡进摄入。</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <div class="status-card" style="flex:1;min-width:180px;padding:8px 12px;">
+                <h3 style="margin:0;font-size:13px;">① Python 后台</h3>
+                <div style="color:${pyOn ? '#22c55e' : '#ef4444'};font-weight:600;margin-top:4px;">${pyOn ? '在跑' : '没跑'}</div>
+                <div class="description">provider=${escapeHtml(d.inject_provider || 'dry_run')} ${
+                    providerOn ? '(接真 → 写卡片)' : '(dry_run → 只算不写)'}</div>
+            </div>
+            <div class="status-card" style="flex:1;min-width:180px;padding:8px 12px;">
+                <h3 style="margin:0;font-size:13px;">② 主动窗口</h3>
+                <div style="color:${win.open ? '#22c55e' : '#f59e0b'};font-weight:600;margin-top:4px;">${win.open ? '开着' : '关着'}</div>
+                <div class="description">${escapeHtml(win.verdict || '')}</div>
+            </div>
+            <div class="status-card" style="flex:1;min-width:180px;padding:8px 12px;">
+                <h3 style="margin:0;font-size:13px;">③ 摄入文件</h3>
+                <div style="color:${cardIn ? '#22c55e' : '#94a3b8'};font-weight:600;margin-top:4px;">${cardIn ? '有卡在等消费' : '空（无可发）'}</div>
+                <div class="description">${escapeHtml(hb.note || '')}</div>
+            </div>
+        </div>
+        <div style="margin-top:8px;">窗口守卫逐条：</div>
+        <div>${gateRows}</div>`;
 }
 
 async function saveReflectionConfig() {
