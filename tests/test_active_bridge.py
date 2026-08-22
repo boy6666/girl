@@ -106,14 +106,16 @@ def test_inject_reflection_defaults_to_dry_run(monkeypatch, tmp_path):
     assert not (tmp_path / "r.md").exists()
 
 
-def test_reflection_cfg_merges_top_level(monkeypatch, tmp_path):
+def test_reflection_cfg_takes_from_matrix(monkeypatch, tmp_path):
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
-        "reflection:\n  provider: openclaw\n", encoding="utf-8")
+        "reflection:\n  window: '23:30'\n"
+        "inject_channels:\n  reflection: {enabled: true, provider: openclaw}\n",
+        encoding="utf-8")
     monkeypatch.setattr(active_bridge, "CFG", cfg)
     rc = active_bridge._reflection_cfg()
-    assert rc["provider"] == "openclaw"
-    assert rc["window"] == "22:00"   # 默认被保留
+    assert rc["provider"] == "openclaw"   # 唯一真相 = 矩阵
+    assert rc["window"] == "23:30"        # 段里的特有参数被保留
 
 
 def test_reflection_endpoint_reports_latest(monkeypatch, tmp_path):
@@ -130,7 +132,9 @@ def test_reflection_endpoint_reports_latest(monkeypatch, tmp_path):
 def test_reflection_get_reports_status_and_config(monkeypatch, tmp_path):
     import asyncio
     cfg = tmp_path / "config.yaml"
-    cfg.write_text("reflection:\n  provider: openclaw\n", encoding="utf-8")
+    cfg.write_text(
+        "inject_channels:\n  reflection: {enabled: true, provider: openclaw}\n",
+        encoding="utf-8")
     monkeypatch.setattr(active_bridge, "CFG", cfg)
     out = asyncio.run(active_bridge.reflection_get())
     assert out["status"]["live"] is True
@@ -140,19 +144,24 @@ def test_reflection_get_reports_status_and_config(monkeypatch, tmp_path):
 def test_reflection_config_set_toggles_provider(monkeypatch, tmp_path):
     import asyncio
     cfg = tmp_path / "config.yaml"
-    cfg.write_text("reflection:\n  provider: dry_run\n", encoding="utf-8")
+    cfg.write_text(
+        "inject_channels:\n  reflection: {enabled: true, provider: dry_run}\n",
+        encoding="utf-8")
     monkeypatch.setattr(active_bridge, "CFG", cfg)
     out = asyncio.run(active_bridge.reflection_config_set({"provider": "openclaw"}))
     assert out["status"]["live"] is True
     assert out["config"]["provider"] == "openclaw"
-    written = (yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}).get("reflection")
-    assert written["provider"] == "openclaw"
+    # 唯一真相落在矩阵，不上 segment
+    written = (yaml.safe_load(cfg.read_text(encoding="utf-8")) or {})
+    assert written["inject_channels"]["reflection"]["provider"] == "openclaw"
 
 
 def test_reflection_config_set_disables(monkeypatch, tmp_path):
     import asyncio
     cfg = tmp_path / "config.yaml"
-    cfg.write_text("reflection:\n  provider: openclaw\n", encoding="utf-8")
+    cfg.write_text(
+        "inject_channels:\n  reflection: {enabled: true, provider: openclaw}\n",
+        encoding="utf-8")
     monkeypatch.setattr(active_bridge, "CFG", cfg)
     out = asyncio.run(active_bridge.reflection_config_set({"enabled": False}))
     assert out["status"]["live"] is False
@@ -206,12 +215,14 @@ def test_circadian_get_wind_down(monkeypatch, tmp_path):
 def test_diary_config_set_toggles_provider(monkeypatch, tmp_path):
     import asyncio
     cfg = tmp_path / "config.yaml"
-    cfg.write_text("diary:\n  provider: dry_run\n", encoding="utf-8")
+    cfg.write_text(
+        "inject_channels:\n  diary: {enabled: true, provider: dry_run}\n",
+        encoding="utf-8")
     monkeypatch.setattr(active_bridge, "CFG", cfg)
     out = asyncio.run(active_bridge.diary_config_set({"provider": "openclaw"}))
     assert out["status"]["live"] is True
-    written = (yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}).get("diary")
-    assert written["provider"] == "openclaw"
+    written = (yaml.safe_load(cfg.read_text(encoding="utf-8")) or {})
+    assert written["inject_channels"]["diary"]["provider"] == "openclaw"
 
 
 def test_diary_get_reports_status_and_latest(monkeypatch, tmp_path):
@@ -238,7 +249,9 @@ def test_diary_trigger_dry_run(monkeypatch):
 def test_dream_config_set_disables(monkeypatch, tmp_path):
     import asyncio
     cfg = tmp_path / "config.yaml"
-    cfg.write_text("dream:\n  provider: openclaw\n", encoding="utf-8")
+    cfg.write_text(
+        "inject_channels:\n  dream: {enabled: true, provider: dry_run}\n",
+        encoding="utf-8")
     monkeypatch.setattr(active_bridge, "CFG", cfg)
     out = asyncio.run(active_bridge.dream_config_set({"enabled": False}))
     assert out["status"]["state"] == "paused"

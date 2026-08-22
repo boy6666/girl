@@ -24,6 +24,7 @@ def default_state(now: datetime | None = None) -> dict:
         "last_growth_date": None,         # 上次"持续生长"提问日（低频，防每天催长）
         "today": now.strftime("%Y-%m-%d"),
         "awaiting_reply": False,
+        "paused": False,             # 链路暂停（__PAUSE__/__RESUME__/真回 自动醒）
     }
 
 

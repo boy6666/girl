@@ -41,10 +41,11 @@ def test_card_default_off_has_no_emoji_line():
     assert "【表情】" not in card
 
 
-def test_card_char_mode_appends_emoji_line():
+def test_card_legacy_char_mode_silently_noop():
+    # char 已废弃（2026-08-22 grill）：旧配置静默降级纯文字，不塞 emoji 字符（违反 dbf8331）
     state = {"energy": 80, "mood": 0.6}
     card = build_motivation_card(state, {}, "", "2026-08-12", emoji_mode="char")
-    assert "【表情】" in card
+    assert "【表情】" not in card
 
 
 def test_card_image_mode_appends_local_image_path():

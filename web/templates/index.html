@@ -79,12 +79,9 @@
             <div class="btn-row">
                 <button class="btn-save" onclick="saveContent()">保存生活底色</button>
                 <button class="btn-ghost" onclick="growToday()">让她今天长一条</button>
-                <button class="btn-ghost" onclick="nudgeNow()">现在就推（试跑·不真发）</button>
             </div>
             <h3>生活日志</h3>
             <div id="life-log" class="preview-box" style="min-height:160px;"></div>
-            <h3>最近一次「推」的卡片</h3>
-            <pre id="life-nudge-card" class="preview-box" style="min-height:90px;"></pre>
         </section>
 
         <!-- 记忆 -->
@@ -92,6 +89,8 @@
             <h1>记忆</h1>
             <p class="description">小语在 OpenClaw 里的会话与对话（girl agent）。她聊过的每一句都在这——这就是她"记得你"的原料。</p>
             <div class="memory-stats" id="memory-stats"></div>
+            <h3>检索的盐度（recall_mode）</h3>
+            <div id="memory-mode-box" class="panel-card" style="margin-bottom:16px;"></div>
             <div class="memory-list" id="memory-list"><p class="loading">加载中…</p></div>
         </section>
 
@@ -130,6 +129,7 @@
                 <div id="growth-link-panel" class="panel-card"></div>
                 <div id="diary-link-panel" class="panel-card"></div>
                 <div id="dream-link-panel" class="panel-card"></div>
+                <div id="inject-channels-panel" class="panel-card"></div>
             </div>
         </section>
     </main>

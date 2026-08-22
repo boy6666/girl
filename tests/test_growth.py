@@ -94,6 +94,11 @@ def test_growth_trigger_no_material_is_honest(monkeypatch, tmp_path):
 def test_growth_trigger_with_real_promise_makes_card(monkeypatch, tmp_path):
     import asyncio
     from web import active_bridge as ab
+    # 唯一真相=矩阵：显式配 growth dry_run → 试跑零副作用（真机开 openclaw 才会写 intake）
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("inject_channels:\n  growth: {enabled: true, provider: dry_run}\n",
+                   encoding="utf-8")
+    monkeypatch.setattr(ab, "CFG", cfg)
     monkeypatch.setattr(ab.growth.life_init, "_GROWTH_DEFAULT", tmp_path / "G.md")
     (tmp_path / "G.md").write_text("我 22 岁了。\n", encoding="utf-8")
     monkeypatch.setattr(ab.growth.reflection, "REFLECTIONS_DIR", tmp_path / "empty_re")

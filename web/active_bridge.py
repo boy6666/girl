@@ -13,7 +13,8 @@ from fastapi.responses import JSONResponse
 from active import (config as cfgmod, state_store, state_machine,
                     life_content, life_journal, life_grower, life_sim,
                     motivation, emoji_matcher, injector, reflection,
-                    circadian, diary, dream, life_init, growth, send_feed)
+                    circadian, diary, dream, life_init, growth, send_feed,
+                    scheduler, inject_channels, memory_mode)
 from . import agent_admin
 
 log = logging.getLogger("web.active")
@@ -30,8 +31,8 @@ _thread = None
 # ---------- 心跳线程 ----------
 
 def _on_window(card: str):
-    # 自动窗口也读 inject_provider（与 /nudge 一致）：dry_run 只打印；
-    # openclaw 把卡片写进心跳文件由小语决定说不说。默认 dry_run，可回滚。
+    # 自动窗口也读注入矩阵（与 CLI nudge 同语义）：provider dry_run 只打印；
+    # openclaw 把卡片写进心跳文件由小语决定说不说。通道开/关在心跳层取舍。
     return injector.inject_motivation(
         card, provider=_active_cfg().get("inject_provider", "dry_run"))
 
@@ -40,7 +41,6 @@ def _heartbeat_loop():
     while True:
         try:
             c = _active_cfg()
-            init = state_store.default_state()
             st = state_store.load(STATE)
             # 先消费「发送日志」：__REPLY__（她回了）→ on_user_reply 解开未回闸；
             # __SELF__（她真主动发了）→ on_active_sent 记主动。靠 girl 真实发出才记，
@@ -48,15 +48,39 @@ def _heartbeat_loop():
             st, kinds = send_feed.consume(st, c)
             if kinds:
                 state_store.save(st, STATE)
-            nxt = state_machine.tick(st if st.get("initialized") else init, c)
+            if st.get("initialized"):
+                nxt = state_machine.tick(st, c)
+            else:
+                # 首 tick 前也捡 consume 落的 paused：__PAUSE__ 在全新 state 上不丢
+                init = state_store.default_state()
+                init["paused"] = bool(st.get("paused"))
+                nxt = state_machine.tick(init, c)
             state_store.save(nxt, STATE)
-            if state_machine.should_open_window(nxt, c):
-                content = life_content.load_content(CONTENT)
-                journal = life_journal.read_journal()
-                card = motivation.build_motivation_card(
-                    nxt, content, journal, str(datetime.now().date()),
-                    emoji_mode=c.get("emoji_mode", "off"))
-                _on_window(card)
+            now = datetime.now()
+            # 通道暂停（__PAUSE__：微信被停/主人按下暂停）→ 主动窗口全体停手：
+            # 不消费时刻表、不拼卡、不注入，卡不白攒。真回/__RESUME__ 会自动醒。
+            # 注意：这是物理通道信号，不是心理卫门——晚间反思/日记/梦/生长照常。
+            if nxt.get("paused"):
+                continue
+            # E3 时间自决：先收她亲口排的时刻，看有没有到点的 → 走时刻路径开窗
+            # （双钥匙 OR：she 排的时刻凌驾渴望/深夜，只留"精力在线"一扇；
+            # 阈值路径照走，两条都开得了窗。）
+            scheduler.consume_inbox(cap=c.get("schedule_cap", 24), now=now)
+            due = scheduler.peek_due(now=now)
+            via_schedule = due is not None
+            if state_machine.should_open_window(nxt, c, now=now,
+                                                via_schedule=via_schedule):
+                if via_schedule:
+                    scheduler.pop_due(now=now)      # 到点即焚：开成与否都由那条时刻决定
+                # 注入通道总控：主动找话通道关着 → 窗口照算，但不拼卡、不注入
+                if inject_channels.on(inject_channels.load(CFG), "motivation"):
+                    content = life_content.load_content(CONTENT)
+                    journal = life_journal.read_journal()
+                    card = motivation.build_motivation_card(
+                        nxt, content, journal, str(now.date()),
+                        emoji_mode=c.get("emoji_mode", "off"),
+                        ask_schedule=c.get("schedule_enabled", True))
+                    _on_window(card)
             rc = _reflection_cfg()
             if reflection.should_reflect(rc, nxt, now=datetime.now()):
                 content = life_content.load_content(CONTENT)
@@ -94,7 +118,9 @@ def _active_cfg() -> dict:
                 "active_behavior", {})
         except yaml.YAMLError:
             c = {}
-    return cfgmod.merge_config(c)
+    c = cfgmod.merge_config(c)
+    # 注入通道总控是唯一真相：emoji 出口/注入/生长/时间自决 一律以矩阵为准
+    return inject_channels.overlay_active(c)
 
 
 def _reflection_cfg() -> dict:
@@ -105,7 +131,11 @@ def _reflection_cfg() -> dict:
                 "reflection") or {}
         except yaml.YAMLError:
             raw = {}
-    return cfgmod.merge_reflection_config(raw)
+    c = cfgmod.merge_reflection_config(raw)
+    ic = inject_channels.load(CFG)
+    c["enabled"] = inject_channels.on(ic, "reflection")
+    c["provider"] = inject_channels.provider(ic, "reflection")
+    return c
 
 
 def _circadian_cfg() -> dict:
@@ -127,18 +157,11 @@ def _diary_cfg() -> dict:
                 "diary") or {}
         except yaml.YAMLError:
             raw = {}
-    return cfgmod.merge_diary_config(raw)
-
-
-def _init_cfg() -> dict:
-    raw = {}
-    if CFG.is_file():
-        try:
-            raw = (yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}).get(
-                "init") or {}
-        except yaml.YAMLError:
-            raw = {}
-    return {"provider": raw.get("provider", "dry_run")}
+    c = cfgmod.merge_diary_config(raw)
+    ic = inject_channels.load(CFG)
+    c["enabled"] = inject_channels.on(ic, "diary")
+    c["provider"] = inject_channels.provider(ic, "diary")
+    return c
 
 
 def _growth_cfg() -> dict:
@@ -149,7 +172,14 @@ def _growth_cfg() -> dict:
                 "growth") or {}
         except yaml.YAMLError:
             raw = {}
-    return cfgmod.merge_growth_config(raw)
+    c = cfgmod.merge_growth_config(raw)
+    ic = inject_channels.load(CFG)
+    c["enabled"] = inject_channels.on(ic, "growth")
+    c["provider"] = inject_channels.provider(ic, "growth")
+    return c
+
+
+def _init_cfg() -> dict:
     raw = {}
     if CFG.is_file():
         try:
@@ -168,7 +198,11 @@ def _dream_cfg() -> dict:
                 "dream") or {}
         except yaml.YAMLError:
             raw = {}
-    return cfgmod.merge_dream_config(raw)
+    c = cfgmod.merge_dream_config(raw)
+    ic = inject_channels.load(CFG)
+    c["enabled"] = inject_channels.on(ic, "dream")
+    c["provider"] = inject_channels.provider(ic, "dream")
+    return c
 
 
 def _parse_contact_dt(ts):
@@ -275,10 +309,30 @@ async def set_config(payload: dict):
             data = yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}
         except yaml.YAMLError:
             data = {}
+    # 唯一真相 = 注入通道矩阵：旧键若被前端误带，一律转写进矩阵，不落 active_behavior
+    _ROUTE_TO_CHANNEL = {
+        "inject_provider": ("motivation", "provider"),
+        "grow_provider": ("growth", "provider"),
+        "emoji_mode": ("emoji", "provider"),
+        "schedule_enabled": ("schedule", "enabled"),
+    }
+    for key, (ch, field) in _ROUTE_TO_CHANNEL.items():
+        if key in payload:
+            _set_matrix_channel(ch, {field: payload.pop(key)})
     data.setdefault("active_behavior", {}).update(payload)
     CFG.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
                    encoding="utf-8")
     return _active_cfg()
+
+
+def _set_matrix_channel(name: str, kw: dict) -> dict | None:
+    """写 inject_channels 某条通道的一个字段，落库（失败静默——读侧照样能读）。
+    统一走 inject_channels.update（唯一写路径），返回整份矩阵。"""
+    try:
+        return inject_channels.update(name, cfg_path=CFG, **kw)
+    except Exception:            # noqa: BLE001
+        log.exception("matrix write failed for %s", name)
+        return None
 
 
 @router.get("/state")
@@ -317,12 +371,27 @@ async def on_sent(payload: dict | None = None):
             "social_need": nxt["social_need"]}
 
 
+@router.get("/schedule")
+async def get_schedule():
+    """E3 时间自决：她亲口排的待开时刻 + inbox 原文（读侧，零写）。"""
+    return {"pending": scheduler.pending(),
+            "inbox": scheduler.read_inbox(),
+            "enabled": _active_cfg().get("schedule_enabled", True),
+            "cap": _active_cfg().get("schedule_cap", 24)}
+
+
 @router.get("/diag")
 async def get_diag():
     """主动发送链路诊断：哪一环断了，为什么没发。
     只读聚合 window_gates + 摄入文件 + 心跳线程存活。"""
     from active import diag as diagmod
+    from active import timing as timingmod
+    from . import agent_admin as aa
     d = diagmod.proactive_diag(CFG, STATE)
+    try:
+        d["latency"] = timingmod.summarize_sessions(aa.SESSIONS_DIR, limit=6)
+    except Exception:            # noqa: BLE001 — 不因计时失败让 diag 崩
+        d["latency"] = {"error": "读会话轨迹失败"}
     alive = bool(_thread and _thread.is_alive())
     d["python_heartbeat_alive"] = alive
     d["python_heartbeat"] = {
@@ -395,19 +464,22 @@ async def grow():
     return {"text": text, "day": day}
 
 
-@router.post("/nudge")
-async def nudge():
-    """手动开一次窗口：拼卡片 → injector（dry_run 默认）。测试用·校验按钮。"""
-    content = life_content.load_content(CONTENT)
-    journal = life_journal.read_journal()
-    st = state_store.load(STATE)
-    day = str(datetime.now().date())
-    card = motivation.build_motivation_card(
-        st, content, journal, day,
-        emoji_mode=_active_cfg().get("emoji_mode", "off"))
-    res = injector.inject_motivation(
-        card, provider=_active_cfg().get("inject_provider", "dry_run"))
-    return {"card": card, "inject": res}
+# 主动窗口触发无 web 假身：主动全归状态机+她本人，
+# 手动测试走 CLI（python -m active.cli nudge），不借 web 按钮替她开口。
+#
+# @router.post("/nudge")
+# async def nudge():
+#     """手动开一次窗口：拼卡片 → injector（dry_run 默认）。测试用·校验按钮。"""
+#     content = life_content.load_content(CONTENT)
+#     journal = life_journal.read_journal()
+#     st = state_store.load(STATE)
+#     day = str(datetime.now().date())
+#     card = motivation.build_motivation_card(
+#         st, content, journal, day,
+#         emoji_mode=_active_cfg().get("emoji_mode", "off"))
+#     res = injector.inject_motivation(
+#         card, provider=_active_cfg().get("inject_provider", "dry_run"))
+#     return {"card": card, "inject": res}
 
 
 @router.get("/emoji/resolve")
@@ -438,7 +510,12 @@ async def reflection_get():
 
 @router.post("/reflection/config")
 async def reflection_config_set(payload: dict):
-    """让用户在后台自己决定两个开关：enabled（每晚反思）/ provider（dry_run|openclaw）。"""
+    """两个开关：enabled/provider 归入矩阵（唯一真相）；window 留在 reflection 段。"""
+    if "window" in payload and not payload.get("window"):
+        payload.pop("window", None)
+    if "enabled" in payload or "provider" in payload or "window" in payload:
+        _set_matrix_channel("reflection", {
+            k: payload[k] for k in ("enabled", "provider") if k in payload})
     data = {}
     if CFG.is_file():
         try:
@@ -446,12 +523,12 @@ async def reflection_config_set(payload: dict):
         except yaml.YAMLError:
             data = {}
     seg = dict(data.get("reflection") or {})
-    for k in ("enabled", "window", "provider"):
-        if k in payload:
-            seg[k] = payload[k]
+    if "window" in payload:
+        seg["window"] = payload["window"]
     data["reflection"] = seg
-    CFG.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
-                   encoding="utf-8")
+    if data.get("reflection"):
+        CFG.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+                       encoding="utf-8")
     cfg = _reflection_cfg()
     return {"config": cfg, "status": reflection.reflection_status(cfg)}
 
@@ -471,6 +548,11 @@ async def reflection_trigger():
 # ---------- 作息 / 日记 / 梦（夜间记忆链路） ----------
 
 def _set_nightly_seg(block: str, payload: dict, allowed: tuple = ("enabled", "provider")) -> None:
+    """夜间链路段写回。enabled/provider 一律归于矩阵（唯一真相）；
+    段里只留通道特有参数（如 growth.interval_days）。"""
+    if "enabled" in payload or "provider" in payload:
+        _set_matrix_channel(block, {
+            k: payload.pop(k) for k in ("enabled", "provider") if k in payload})
     data = {}
     if CFG.is_file():
         try:
@@ -601,3 +683,79 @@ async def growth_trigger():
         return {"card": None, "note": "这段时间没有真实沉淀(反思/承诺·缺席) → 不现编, 她没长就是没长。"}
     res = growth.inject_growth_card(card, provider=_growth_cfg().get("provider", "dry_run"))
     return {"card": card, "inject": res}
+
+
+# ---------- 注入通道总控（KEY_INJECT_* 统一矩阵） ----------
+
+@router.get("/inject_channels")
+async def inject_channels_get():
+    """整份矩阵 + 每条通道的元信息（前端渲染总控页一次拿全）。只读，零写。"""
+    channels = inject_channels.load(CFG)
+    return {"channels": channels,
+            "meta": inject_channels.META,
+            "status": {name: inject_channels.status(channels, name)
+                       for name in channels}}
+
+
+@router.post("/inject_channels")
+async def inject_channels_set(payload: dict):
+    """保存整份矩阵（每条 {enabled, provider} 全量可读写）。支持整体或单条合并。"""
+    if "channels" in payload and isinstance(payload["channels"], dict):
+        channels = inject_channels.load(CFG)
+        for name, seg in payload["channels"].items():
+            if name not in channels or not isinstance(seg, dict):
+                continue
+            channels[name].update({
+                k: seg[k] for k in ("enabled", "provider") if k in seg})
+        out = inject_channels.save(channels, CFG)
+    else:                        # 单条 {name: {enabled/provider}} 便捷写
+        name = payload.get("name")
+        if not name or name not in inject_channels.DEFAULTS:
+            return JSONResponse({"error": f"未知通道: {name}"}, status_code=400)
+        out = _set_matrix_channel(name, {
+            k: payload[k] for k in ("enabled", "provider") if k in payload}) or \
+            inject_channels.load(CFG)
+    return {"channels": out,
+            "status": {n: inject_channels.status(out, n) for n in out}}
+
+
+# ---------- 记忆·检索盐度（recall_mode） ----------
+
+@router.get("/memory_mode")
+async def memory_mode_get():
+    """当前 recall_mode + 三档说明 + §记忆 分块预览（只读）。"""
+    mode = memory_mode.load_mode(CFG)
+    return {"mode": mode, "modes": list(memory_mode.MODES),
+            "guidance": memory_mode.GUIDANCE,
+            "intake_has_block": memory_mode._BEGIN in _read_intake()}
+
+
+@router.post("/memory_mode")
+async def memory_mode_set(payload: dict):
+    """写 memory.recall_mode 并重渲染 PROACTIVE_INTAKE §记忆 分块。"""
+    mode = payload.get("mode", "")
+    if mode not in memory_mode.MODES:
+        return JSONResponse({"error": f"recall_mode 只能是 {list(memory_mode.MODES)}"},
+                            status_code=400)
+    data = {}
+    if CFG.is_file():
+        try:
+            data = yaml.safe_load(CFG.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            data = {}
+    mem = dict(data.get("memory") or {})
+    mem["recall_mode"] = mode
+    data["memory"] = mem
+    CFG.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+                   encoding="utf-8")
+    block = memory_mode.apply_to_intake(mode)
+    return {"mode": mode,
+            "block_written": bool(block),
+            "guidance": memory_mode.GUIDANCE[mode]}
+
+
+def _read_intake() -> str:
+    try:
+        return memory_mode.INTAKE_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return ""

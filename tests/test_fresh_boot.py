@@ -44,6 +44,11 @@ def test_boots_clean_without_openclaw_or_data(monkeypatch, tmp_path):
         assert circ["inputs"]["last_contact_clock"] is None
         assert circ["schedule"]["bedtime"]  # 有基础就寝时间
 
-        # 无 config → 全部回落 dry_run（零发送保障）
-        d = c.get("/api/active/diary").json()
-        assert d["status"]["live"] is False or d["config"]["provider"] == "dry_run"
+        # 无 config → 回落矩阵默认（对齐线上有效值：已接真通道默认 openclaw）。
+        # "零发送"是结构性的：Python 侧注入只写 intake 文件，真发微信在 OpenClaw
+        # 侧（新生机没有它）→ 文件写了也不会有消息发出去。未接真通道默认 dry_run → 不报告 live。
+        ic = c.get("/api/active/inject_channels").json()
+        assert ic["channels"]["dream"]["provider"] == "dry_run"
+        assert ic["status"]["dream"] == "trial"
+        assert ic["status"]["motivation"] == "live"   # 默认已接真 → 声明即 live
+

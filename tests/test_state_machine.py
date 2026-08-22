@@ -70,23 +70,29 @@ def test_window_opens_afternoon():
     assert sm.should_open_window(base(social_need=0.9, energy=80.0), CFG, datetime(2026, 8, 11, 14, 0))
 
 
-def test_quiet_hours_blocks():
-    assert not sm.should_open_window(base(social_need=0.9, energy=80.0), CFG, datetime(2026, 8, 11, 3, 0))
+# ===== 2026-08-21 grill 拍板：四扇卫门拆了 =====
+# 冷却(300s) / 每日上限(2/天) / 勿扰硬墙(02:00–05:00) / 未回未超限 全拆——
+# 判"打扰不打扰"全交给她自己（功能=心理活动），只留体内三扇 + 时间自决双钥匙。
+
+def test_no_more_quiet_hard_wall():
+    # 凌晨 3 点但渴望足、精力在 → 阈值路径应照开（勿扰硬墙已拆）
+    assert sm.should_open_window(base(social_need=0.9, energy=80.0), CFG, datetime(2026, 8, 11, 3, 0))
 
 
-def test_cooldown_blocks():
+def test_no_more_cooldown():
     s = base(social_need=0.9, energy=80.0, last_active_ts="2026-08-11T13:58:00")
-    assert not sm.should_open_window(s, CFG, datetime(2026, 8, 11, 14, 0))
+    assert sm.should_open_window(s, CFG, datetime(2026, 8, 11, 14, 0))
 
 
-def test_daily_max_blocks():
-    assert not sm.should_open_window(base(social_need=0.9, energy=80.0, today_active_count=2),
-                                     CFG, datetime(2026, 8, 11, 14, 0))
+def test_no_more_daily_max():
+    assert sm.should_open_window(base(social_need=0.9, energy=80.0, today_active_count=2),
+                                 CFG, datetime(2026, 8, 11, 14, 0))
 
 
-def test_unanswered_max_blocks():
-    assert not sm.should_open_window(base(social_need=0.9, energy=80.0, unanswered_count=3),
-                                     CFG, datetime(2026, 8, 11, 14, 0))
+def test_no_more_unanswered_cap():
+    # 连发 3+ 条的等待期也照开；未回只作状态 flag，不挡窗
+    assert sm.should_open_window(base(social_need=0.9, energy=80.0, unanswered_count=5),
+                                 CFG, datetime(2026, 8, 11, 14, 0))
 
 
 def test_energy_low_blocks():
@@ -96,6 +102,39 @@ def test_energy_low_blocks():
 def test_late_night_disabled_blocks():
     cfg = {**CFG, "allow_late_night": False}
     assert not sm.should_open_window(base(social_need=0.9, energy=80.0), cfg, datetime(2026, 8, 11, 0, 0))
+
+
+# ===== 时间自决（E3）：via_schedule 走时刻路径，双钥匙 OR =====
+# 她排的时刻 → 凌驾渴望阈值 + 凌驾深夜软窗，只留"精力在线"一扇。
+
+def test_via_schedule_opens_when_need_low():
+    # 渴望没到阈值，但她亲口排了时刻 → 窗口开（凌驾阈值路径）
+    assert sm.should_open_window(base(social_need=0.1, energy=80.0), CFG,
+                                 datetime(2026, 8, 11, 14, 0), via_schedule=True)
+
+
+def test_via_schedule_overrides_late_night():
+    cfg = {**CFG, "allow_late_night": False}
+    assert sm.should_open_window(base(social_need=0.1, energy=80.0), cfg,
+                                 datetime(2026, 8, 11, 0, 0), via_schedule=True)
+
+
+def test_via_schedule_still_requires_energy():
+    assert not sm.should_open_window(base(social_need=0.1, energy=10.0), CFG,
+                                     datetime(2026, 8, 11, 14, 0), via_schedule=True)
+
+
+def test_via_schedule_ignores_awaiting():
+    assert sm.should_open_window(base(social_need=0.1, energy=80.0,
+                                      awaiting_reply=True, unanswered_count=9), CFG,
+                                 datetime(2026, 8, 11, 14, 0), via_schedule=True)
+
+
+def test_awaiting_unanswered_keeps_counting_uncapped():
+    # 未回只在 awaiting 时 +1，且不再封顶（它只是状态 flag）
+    s = base(awaiting_reply=True, unanswered_count=3)
+    s1 = sm.tick(s, CFG, datetime(2026, 8, 11, 14, 0))
+    assert s1["unanswered_count"] == 4
 
 
 def test_active_sent_increments_and_relief():

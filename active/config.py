@@ -3,12 +3,9 @@ from pathlib import Path
 
 CONFIG_DEFAULTS = {
     "open_threshold": 0.5,           # 社交需求达到多少才考虑开窗
-    "cooldown_seconds": 300,         # 主动冷却（秒）
-    "daily_max": 2,                  # 每日主动上限（次）
-    "quiet_start": 2,                # 勿扰硬墙开始（时）——绝不在这些时辰主动
-    "quiet_end": 5,                  # 勿扰硬墙结束（时）
-    "max_unanswered": 3,             # 连续未回上限（达到暂停催人）
-    "allow_late_night": True,        # 是否允许凌晨/深夜软窗口
+    # 拍板（2026-08-21 grill）拆掉的四扇卫门：冷却 / 每日上限 / 勿扰硬墙 / 未回未超限。
+    # 意在把"打扰不打扰"的判定全部交给她自己（功能即心理活动），只留体内三扇（见 state_machine）。
+    "allow_late_night": True,        # 是否允许凌晨/深夜软窗口（阈值路径挡；她亲口排的时刻可压过）
     "late_night_start": 23,          # 深夜软窗口开始（时）
     "early_morning_end": 6,          # 深夜软窗口结束（时）
     "tick_minutes": 15,              # 心跳间隔（分钟）
@@ -32,10 +29,16 @@ CONFIG_DEFAULTS = {
     "seed_mood": 0.2,
     "grow_provider": "dry_run",      # dry_run | openclaw（真生长见 Task 14）
     "inject_provider": "dry_run",    # dry_run | openclaw（真注入见 Task 14）
-    "emoji_mode": "off",                    # off | char | image — 表情出口；image 需接真后再启用
+    "emoji_mode": "off",                    # off | image — 图片表情包出口（矩阵唯一真相）；char 已废弃
+                                            # （消息文字禁 emoji 字符/颜文字可(commit dbf8331)，image=卡带【表情】图=<本地路径>）
     "emoji_sources": ["adesk", "sogou"],    # image 模式的稳定图源，可自配
     "emoji_media_dir": "data/media",        # 本地表情包文件夹（相对仓库根，gitignored）
     "emoji_media_ttl_days": 14,             # 旧图自动清理（天）
+    # ===== E3 自定时刻（爱语时间自决协议移植）=====
+    # 挂每次开窗：窗口卡片尾部带「下次几点」追问；她回 schedule_in.md，
+    # 格式只认 HH:MM 或 数字+单位(s|min|h)，一次一换、用完即焚、到点凌驾渴望/深夜。
+    "schedule_enabled": True,        # 开窗卡片是否带「下次几点」追问
+    "schedule_cap": 24,              # pending 时刻上限（爱语原版 ≤24）
 }
 
 

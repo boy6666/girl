@@ -6,11 +6,6 @@ personality:
   humor: 55
 active_behavior:
   open_threshold: 0.5
-  cooldown_seconds: 300
-  daily_max: 2
-  quiet_start: 2
-  quiet_end: 5
-  max_unanswered: 3
   allow_late_night: true
   late_night_start: 23
   early_morning_end: 6
@@ -22,14 +17,13 @@ active_behavior:
   attachment: secure
   seed_energy: 80.0
   seed_mood: 0.2
-  grow_provider: openclaw
-  inject_provider: openclaw
-  emoji_mode: image
+  schedule_cap: 24
 memory:
   context_turns: 10
   summary_max_length: 200
   similarity_threshold: 0.7
   daily_memory_limit: 50
+  recall_mode: auto            # 记忆检索盐度: eager | auto | cautious（渲染进 PROACTIVE_INTAKE §记忆）
 ai:
   chat_model: deepseek-chat
   chat_api_base: https://api.deepseek.com/v1
@@ -37,8 +31,18 @@ ai:
   local_api_base: http://localhost:11434
   embedding_model: nomic-embed-text
 reflection:
-  window: '22:00'
-  provider: openclaw
+  window: '22:00'               # enabled/provider 归入 inject_channels（唯一真相）
+inject_channels:                # 注入通道总控 10 开关（爱语 KEY_INJECT_* 移植）— 唯一真相
+  motivation:  {enabled: true,  provider: openclaw}   # 主动找话（动机卡→heartbeat.md）
+  reflection:  {enabled: true,  provider: openclaw}   # 每晚自我反思（reflect.md）
+  diary:       {enabled: true,  provider: openclaw}   # 每晚日记（diary_in.md）
+  dream:       {enabled: true,  provider: dry_run}    # 非每日梦记（dream_in.md）
+  growth:      {enabled: true,  provider: openclaw}   # 持续生长（GROWTH.md 底子续长）
+  schedule:    {enabled: true,  provider: openclaw}   # E3 时间自决（「下次几点」）
+  emoji:       {enabled: true,  provider: image}      # 图片表情包: off|image（char 已废弃——消息文字禁 emoji 字符）
+  relation:    {enabled: true,  provider: openclaw}   # 羁绊/依恋线索（OpenClaw 侧执行）
+  perception:  {enabled: false, provider: none}       # 感知注记: none=零成本 note / vision=多模态描述
+  search:      {enabled: true,  provider: openclaw}   # 记忆检索闸（镜像 OpenClaw QMD，契约型）
 wechat:
   protocol_version: v3
   auto_accept_friend: false

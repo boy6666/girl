@@ -69,10 +69,10 @@ def tick(state, config, now=None, reply_quality=None) -> dict:
         grow = (config["growth_rate_per_hour"] * dt_h
                 * (0.6 + 0.4 * moodn) * mult * bond_f)
         s["social_need"] = _clamp(s["social_need"] + grow, 0.0, 1.0)
-        # 未回计数：awaiting_reply 时每心跳 +1（封顶 max_unanswered）
+        # 未回计数：只是状态 flag（awaiting_reply 期间每心跳 +1）。
+        # 2026-08-21 grill 拍板：「未回未超限」这扇卫门拆了，不拿它挡开窗。
         if s.get("awaiting_reply"):
-            s["unanswered_count"] = min(config["max_unanswered"],
-                                        s["unanswered_count"] + 1)
+            s["unanswered_count"] = s["unanswered_count"] + 1
         base = config.get("mood_baseline", 0.15)
         k = 1 - math.exp(-1.0 / config["mood_time_constant_min"])
         s["mood"] += (base - s["mood"]) * k
@@ -94,23 +94,24 @@ def _dt_hours(state, now) -> float:
         return 1.0
 
 
-def window_gates(state, config, now=None) -> list:
+def window_gates(state, config, now=None, via_schedule=False) -> list:
     """逐条列出"主动窗口"的全部守卫：{gate, ok, value, limit, detail}。
-    供 should_open_window 判定，也让 Web 后台能逐个显示"卡在哪一条"（debug）。"""
+    供 should_open_window 判定，也让 Web 后台能逐个显示"卡在哪一条"（debug）。
+
+    2026-08-21 grill 拍板：四扇卫门（冷却/每日上限/勿扰硬墙/未回未超限）拆了，
+    只剩体内三扇 + double-key：阈值路径走全部门，时刻路径(via_schedule)只走精力。
+    """
     now = now or datetime.now()
     s = _init(state, config)
     hour = now.hour
-    qs, qe = int(config["quiet_start"]), int(config["quiet_end"])
-    in_quiet = (qs <= hour < qe) if qs <= qe else (hour >= qs or hour < qe)
 
-    last_a = s.get("last_active_ts")
-    cooling = False
-    if last_a:
-        try:
-            t0 = datetime.fromisoformat(last_a)
-            cooling = (now - t0).total_seconds() < config["cooldown_seconds"]
-        except (TypeError, ValueError):
-            cooling = False
+    gates = [
+        {"gate": "精力在线", "ok": s["energy"] >= 20,
+         "value": round(s["energy"], 1), "limit": "≥ 20", "detail": "太累就不开口"},
+    ]
+    if via_schedule:
+        # 她亲口排的时刻：凌驾渴望阈值、凌驾深夜软窗，只留这一扇。
+        return gates
 
     late_blocks = False
     if not config.get("allow_late_night", True):
@@ -122,30 +123,17 @@ def window_gates(state, config, now=None) -> list:
          "value": round(s["social_need"], 3),
          "limit": f"≥ {config.get('open_threshold', 0.5)}",
          "detail": "越久没被真回，渴望越高"},
-        {"gate": "精力在线", "ok": s["energy"] >= 20,
-         "value": round(s["energy"], 1), "limit": "≥ 20", "detail": "太累就不开口"},
-        {"gate": "不在勿扰时段", "ok": not in_quiet,
-         "value": f"{hour:02d}:00", "limit": f"避开 {qs:02d}:00–{qe:02d}:00",
-         "detail": "勿扰时间只静默"},
-        {"gate": "过了冷却", "ok": not cooling,
-         "value": last_a or "—", "limit": f"距上次 ≥ {config['cooldown_seconds']}s",
-         "detail": "刚主动过就先歇"},
-        {"gate": "未达每日上限", "ok": s["today_active_count"] < config["daily_max"],
-         "value": s["today_active_count"],
-         "limit": f"< {config['daily_max']}", "detail": "每天最多主动几次"},
-        {"gate": "未回未超限", "ok": s["unanswered_count"] < config["max_unanswered"],
-         "value": s["unanswered_count"],
-         "limit": f"< {config['max_unanswered']}",
-         "detail": "ta 没真回就不一直催（回一条消息会清零）"},
+        *gates,
         {"gate": "允许深夜", "ok": not late_blocks,
          "value": f"{hour:02d}:00", "limit": f"{config['late_night_start']}:00–{config['early_morning_end']}:00",
-         "detail": "深夜开关已关时这一条不通过"},
+         "detail": "深夜开关已关时这一条不通过；她亲口排的时刻可压过"},
     ]
 
 
-def should_open_window(state, config, now=None) -> bool:
-    """是否开放一个"主动窗口"（全部守卫满足才 True）。"""
-    return all(g["ok"] for g in window_gates(state, config, now))
+def should_open_window(state, config, now=None, via_schedule=False) -> bool:
+    """是否开放一个"主动窗口"（全部守卫满足才 True）。
+    via_schedule=True 走时刻路径：她排的时刻凌驾渴望阈值与深夜软窗，双钥匙 OR。"""
+    return all(g["ok"] for g in window_gates(state, config, now, via_schedule))
 
 
 def on_active_sent(state, config, now=None) -> dict:

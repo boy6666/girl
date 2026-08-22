@@ -88,13 +88,17 @@ def test_missing_file_is_noop(tmp_path):
     assert st2 == st
 
 
-def test_reply_unlocks_unanswered_gate(tmp_path):
+def test_reply_no_longer_gated_by_unanswered(tmp_path):
+    # 2026-08-21 grill 拍板：未回未超限拆了，真回后不靠它放行，窗门里根本没它
     from active import state_machine
     f = tmp_path / "send_feed.md"
     f.write_text("__REPLY__\n", encoding="utf-8")
     now = datetime(2026, 8, 18, 14, 0)
     cfg = _cfg()
     st, _ = send_feed.consume(_base(), cfg, path=f, now=now)
-    gate = next(g for g in state_machine.window_gates(st, cfg, now)
-                if g["gate"] == "未回未超限")
-    assert gate["ok"] is True
+    names = [g["gate"] for g in state_machine.window_gates(st, cfg, now)]
+    assert "未回未超限" not in names
+    # 真回后 awaiting 松开；渴望再涨上来到点 → 阈值路径照开
+    st2 = dict(st)
+    st2["social_need"] = 0.9
+    assert state_machine.should_open_window(st2, cfg, now)

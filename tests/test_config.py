@@ -5,17 +5,19 @@ from active import config as c
 
 def test_defaults_exist():
     assert c.CONFIG_DEFAULTS["open_threshold"] == 0.5
-    assert c.CONFIG_DEFAULTS["daily_max"] == 2
-    assert c.CONFIG_DEFAULTS["quiet_start"] == 2
-    assert c.CONFIG_DEFAULTS["quiet_end"] == 5
-    assert c.CONFIG_DEFAULTS["max_unanswered"] == 3
+    assert c.CONFIG_DEFAULTS["schedule_enabled"] is True
+    assert c.CONFIG_DEFAULTS["schedule_cap"] == 24
     assert c.CONFIG_DEFAULTS["attachment"] == "secure"
+    # 2026-08-21 grill 拍板：四扇卫门拆了，默认值里不该再有它们
+    for gone in ("cooldown_seconds", "daily_max", "quiet_start", "quiet_end",
+                 "max_unanswered"):
+        assert gone not in c.CONFIG_DEFAULTS, f"{gone} 已被拆，不该留在默认里"
 
 
 def test_merge_overrides_and_ignores_unknown():
     merged = c.merge_config({"open_threshold": 0.7, "bogus": 1})
     assert merged["open_threshold"] == 0.7
-    assert merged["daily_max"] == 2
+    assert merged["schedule_cap"] == 24
     assert "bogus" not in merged
 
 

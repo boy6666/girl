@@ -196,6 +196,7 @@ async function loadMemory() {
             <div class="stat-card"><div class="stat-number">${data.total_messages}</div><div class="stat-label">消息数</div></div>
             <div class="stat-card"><div class="stat-number">${data.sessions.length}</div><div class="stat-label">会话</div></div>
         `;
+        loadMemoryMode();
         const box = document.getElementById('memory-list');
         if (!data.sessions.length) {
             box.innerHTML = '<p class="loading">还没有会话 —— 去微信里跟小语说句话吧。</p>';
@@ -208,6 +209,53 @@ async function loadMemory() {
         ).join('')).join('');
     } catch (e) {
         document.getElementById('memory-list').innerHTML = '<p class="loading">加载失败</p>';
+    }
+}
+
+// ---------- 记忆·检索盐度（recall_mode） ----------
+async function loadMemoryMode() {
+    const box = document.getElementById('memory-mode-box');
+    if (!box) return;
+    let d;
+    try {
+        d = await (await fetch('/api/active/memory_mode')).json();
+    } catch (e) {
+        box.innerHTML = '<p class="description">读取 recall_mode 失败</p>';
+        return;
+    }
+    const modeMeta = {
+        eager: ['多翻', '#f59e0b'],
+        auto: ['随手', '#22c55e'],
+        cautious: ['沉住', '#3b82f6'],
+    }[d.mode] || [];
+    const g = (d.guidance || {})[d.mode] || '';
+    box.innerHTML = `
+        <p class="description" style="margin-bottom:10px;">她检索记忆这一口的咸淡：多勤翻旧账、翻多深。改完立刻重渲染 PROACTIVE_INTAKE §记忆，下一条消息生效。</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <label class="beh" style="flex:1;min-width:180px;">
+                <span>recall_mode</span>
+                <select id="mm-mode">
+                    ${['eager', 'auto', 'cautious'].map(m =>
+                        `<option value="${m}" ${m === d.mode ? 'selected' : ''}>${m} · ${modeMeta[0] || ''}</option>`).join('')}
+                </select>
+            </label>
+            <button class="btn-ghost" onclick="saveMemoryMode()">保存这一档</button>
+        </div>
+        <p class="description" style="margin-top:10px;color:#94a3b8;">${escapeHtml(g)}</p>`;
+}
+
+async function saveMemoryMode() {
+    const mode = document.getElementById('mm-mode').value;
+    try {
+        const res = await (await fetch('/api/active/memory_mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode }),
+        })).json();
+        showToast(res.block_written ? '✓ 已切换 ' + mode + '，§记忆 已重渲染' : '已保存（但 §记忆 未写入）');
+        loadMemoryMode();
+    } catch (e) {
+        showToast('保存 recall_mode 失败');
     }
 }
 
@@ -302,8 +350,75 @@ async function loadStatus() {
         try { diag = await (await fetch('/api/active/diag')).json(); } catch (e) {}
         if (diag) renderActiveLink(diag);
         loadGrowthPanel();
+        loadInjectChannels();
     } catch (e) {
         showToast('加载状态失败');
+    }
+}
+
+// ============ 注入通道总控（KEY_INJECT_* 统一矩阵 10 开关） ============
+// 唯一真相 = config.yaml 顶层 inject_channels 段；本面板全量可读写。
+let IC_DATA = null;
+async function loadInjectChannels() {
+    const panel = document.getElementById('inject-channels-panel');
+    if (!panel) return;
+    let d;
+    try {
+        d = await (await fetch('/api/active/inject_channels')).json();
+    } catch (e) {
+        panel.innerHTML = '<h3 style="margin:0 0 6px;">注入通道总控</h3><p class="description">读取失败</p>';
+        return;
+    }
+    IC_DATA = d;
+    const ch = d.channels || {};
+    const meta = d.meta || {};
+    const st = d.status || {};
+    const badge = s => ({ live: ['接真', '#22c55e'], trial: ['试跑', '#f59e0b'], off: ['关', '#64748b'] }[s] || []);
+    const rows = Object.keys(ch).map(name => {
+        const m = meta[name] || {};
+        const seg = ch[name];
+        const [bl, bc] = badge(st[name]);
+        const provSel = (m.providers || []).map(p =>
+            `<option value="${p}" ${seg.provider === p ? 'selected' : ''}>${p}</option>`).join('');
+        return `<div class="ic-row" style="display:flex;gap:10px;align-items:center;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">
+            <div style="min-width:150px;">
+                <b>${escapeHtml(m.label || name)}</b> <span style="color:${bc};font-size:12px;">● ${bl}</span>
+                <div class="description" style="font-size:12px;">${escapeHtml(m.detail || '')}</div>
+            </div>
+            <label class="beh" style="min-width:96px;margin:0;">
+                <span>开关</span>
+                <select id="ic-${name}-en" onchange="saveInjectChannel('${name}', 'enabled', this.value)">
+                    <option value="true" ${seg.enabled ? 'selected' : ''}>开</option>
+                    <option value="false" ${!seg.enabled ? 'selected' : ''}>关</option>
+                </select>
+            </label>
+            <label class="beh" style="min-width:120px;margin:0;">
+                <span>provider</span>
+                <select id="ic-${name}-pv" onchange="saveInjectChannel('${name}', 'provider', this.value)">
+                    ${provSel}
+                </select>
+            </label>
+        </div>`;
+    }).join('');
+    panel.innerHTML = `
+        <h3 style="margin:0 0 4px;">注入通道总控（KEY_INJECT_* · 10 开关）</h3>
+        <p class="description" style="margin-bottom:8px;">config.yaml 顶层 inject_channels 段 = 唯一真相。Python 侧各通道的 enabled/provider 都以它为准；页面改完即生效、无需重启。contract 侧（OpenClaw 执行的 search/perception/relation）页面只记意图，记得同步 OpenClaw 侧。</p>
+        ${rows}`;
+}
+
+async function saveInjectChannel(name, field, value) {
+    try {
+        const payload = {};
+        payload[field] = field === 'enabled' ? value === 'true' : value;
+        await (await fetch('/api/active/inject_channels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, ...payload }),
+        })).json();
+        showToast('已保存 inject_channels.' + name + '.' + field);
+        loadInjectChannels();
+    } catch (e) {
+        showToast('保存注入通道失败');
     }
 }
 
@@ -478,18 +593,18 @@ async function growthTrigger() {
 }
 
 // ============ 主动状态机 ============
+// 2026-08-21 grill 拍板：冷却/每日上限/勿扰硬墙/未回未超限 四扇卫门拆了，
+// 只剩 渴望阈值/精力在线/深夜软窗 三扇 + E3 时间自决开关。
 const ACTIVE_RANGE_FIELDS = [
     { k: 'open_threshold',    min: 0,   max: 1,    step: 0.05, label: '开启阈值' },
-    { k: 'cooldown_seconds',  min: 60,  max: 3600, step: 60,   label: '主动冷却(秒)' },
-    { k: 'daily_max',         min: 1,   max: 10,   step: 1,    label: '每日上限' },
-    { k: 'max_unanswered',    min: 1,   max: 10,   step: 1,    label: '未回上限' },
     { k: 'late_night_start',  min: 0,   max: 23,   step: 1,    label: '深夜窗口开始' },
     { k: 'early_morning_end', min: 1,   max: 8,    step: 1,    label: '深夜窗口结束' },
+    { k: 'schedule_cap',      min: 1,   max: 24,   step: 1,    label: '待排时刻上限' },
 ];
+// 注入/生长/时间自决/表情 这些"通道开关"已上收「注入通道总控」矩阵（状态页），
+// 本页只留状态机体内的参数：依恋类型。provider/emoji 的真相在 inject_channels 段。
 const ACTIVE_SELECT_FIELDS = [
-    { k: 'attachment',      options: ['secure', 'anxious', 'avoidant'], label: '依恋类型(0回避=secure=焦虑1)' },
-    { k: 'grow_provider',   options: ['dry_run', 'openclaw'],           label: '生长方式(dry=样例 / openclaw=真生长)' },
-    { k: 'inject_provider', options: ['dry_run', 'openclaw'],           label: '注入方式(dry=试跑 / openclaw=真发)' },
+    { k: 'attachment',        options: ['secure', 'anxious', 'avoidant'], label: '依恋类型(0回避=secure=焦虑1)' },
 ];
 
 async function loadActive() {
@@ -539,7 +654,8 @@ function renderActiveSliders(cfg) {
                    value="${cfg[f.k] ?? f.min}" id="act-${f.k}" data-key="${f.k}">
         </div>`).join('');
     ACTIVE_SELECT_FIELDS.forEach(f => {
-        const cur = cfg[f.k] ?? f.options[0];
+        // schedule_enabled 在配置里是布尔，选项中转成字符串比
+        const cur = String(cfg[f.k] ?? f.options[0]);
         html += `<div class="slider-group sel">
             <label>${f.label}</label>
             <select id="act-${f.k}" data-key="${f.k}">
@@ -565,7 +681,7 @@ async function saveActiveConfig() {
     });
     ACTIVE_SELECT_FIELDS.forEach(f => {
         const el = document.getElementById(`act-${f.k}`);
-        payload[f.k] = el.value;
+        payload[f.k] = f.k === 'schedule_enabled' ? el.value === 'true' : el.value;
     });
     clearTimeout(_saveTimer);
     _saveTimer = setTimeout(async () => {
@@ -629,15 +745,6 @@ async function growToday() {
         showToast(j.text ? '✓ 已生长一条' : '（本次没长出内容）');
         loadLife();
     } catch (e) { showToast('生长失败'); }
-}
-
-async function nudgeNow() {
-    try {
-        const j = await (await fetch('/api/active/nudge', { method: 'POST' })).json();
-        document.getElementById('life-nudge-card').textContent =
-            `卡片:\n${j.card}\n\n注入: ${j.inject.provider} · sent=${j.inject.sent}`;
-        showToast(j.inject.sent ? '（真的被推了一次）' : '试跑：卡片已生成，未真发');
-    } catch (e) { showToast('推送失败'); }
 }
 
 async function reflectNow() {

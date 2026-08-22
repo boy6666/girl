@@ -37,8 +37,8 @@ def _emoji_suggestion(state: dict, mode: str, resolver) -> str:
     em = emoji_matcher.mood_to_emotion(state.get("mood"), state.get("energy"))
     if not em:
         return ""
-    if mode == "char":
-        return f"【表情】此刻情绪合适用「{emoji_matcher.resolve_char(em)}」这种，一个就够"
+    # char 已废弃（2026-08-22 grill 拍板：要的是表情包不是文字 emoji）：
+    # 旧 emoji_mode: char 静默降级纯文字，绝不再往消息里塞 emoji 字符（违反 dbf8331）
     if mode == "image":
         local, _provider = (resolver or emoji_media.resolve_to_local)(em)
         if not local:
@@ -52,7 +52,8 @@ def build_motivation_card(state: dict, content: dict, journal: str, day: str,
                           now: datetime | None = None,
                           emoji_mode: str = "off",
                           emoji_resolver=None,
-                          relations: dict | None = None) -> str:
+                          relations: dict | None = None,
+                          ask_schedule: bool = False) -> str:
     now = now or datetime.now()
     act = life_sim.current_activity(content, day, now.hour)
     highs = life_sim.today_highlights(content, day, now.hour)
@@ -77,4 +78,7 @@ def build_motivation_card(state: dict, content: dict, journal: str, day: str,
     hint = _emoji_suggestion(state, emoji_mode, emoji_resolver)
     if hint:
         lines.append(hint)
+    if ask_schedule:
+        # E3 时间自决：每次开窗卡片尾部带「下次几点」追问，她回 schedule_in.md。
+        lines.append("【下次几点】心里若隐约有想被他找到的时刻，说「HH:MM」或「N min/h」；没有就跳过不答。")
     return "\n".join(lines)
