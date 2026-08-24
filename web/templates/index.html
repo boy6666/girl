@@ -19,12 +19,16 @@
             <a class="nav-item" data-page="memgraph" href="#"><span class="icon">🕸️</span>记忆图谱</a>
             <a class="nav-item" data-page="files" href="#"><span class="icon">📄</span>人格文件</a>
             <a class="nav-item" data-page="behavior" href="#"><span class="icon">🤖</span>行为</a>
+            <a class="nav-item" data-page="context" href="#"><span class="icon">📏</span>上下文开销</a>
             <a class="nav-item" data-page="status" href="#"><span class="icon">📊</span>状态</a>
         </nav>
         <div class="sidebar-note">改动人格：保存后<br>下一条微信消息生效</div>
     </aside>
 
     <main class="main-content">
+        <!-- 上下文开销黄条（P0 计量告警，全局可见） -->
+        <div id="ctx-banner" class="ctx-banner" style="display:none;"></div>
+
         <!-- 人格调参 -->
         <section class="page active" id="page-personality">
             <h1>人格调参</h1>
@@ -115,6 +119,28 @@
             <p class="description">主动行为参数（V1 定时找话的基础；V1.5 状态机会接管 energy/mood/social_need）。</p>
             <div class="behavior-grid" id="behavior-grid"></div>
             <button class="btn-save" onclick="saveBehavior()">保存行为配置</button>
+        </section>
+
+        <!-- 上下文开销 -->
+        <section class="page" id="page-context">
+            <h1>上下文开销</h1>
+            <p class="description">每轮喂给模型的 token 账本（读 OpenClaw 已写盘的日志 + 网关观察，<strong>P0 只读数、不裁剪</strong>）。黄条亮 = 轮数滚雪球或开销超阈值；真正的裁剪（对齐爱语 KEY_SEND_HISTORY_LIMIT）是 P1。</p>
+            <div class="ctx-cards" id="ctx-cards"></div>
+            <div id="ctx-warns" class="ctx-warns"></div>
+            <h3>最近每轮（usage 实测）</h3>
+            <table class="ctx-table">
+                <thead><tr><th>时间</th><th>模型</th><th>input</th><th>cacheRead</th><th>output</th><th>total</th><th>cost $</th></tr></thead>
+                <tbody id="ctx-latest"></tbody>
+            </table>
+            <h3>最近拼装（编译视角：系统恒量 vs 历史滚雪球）</h3>
+            <pre class="preview-box" id="ctx-compiled"></pre>
+            <h3>按日合计</h3>
+            <table class="ctx-table">
+                <thead><tr><th>日期</th><th>轮数</th><th>input</th><th>cacheRead</th><th>output</th><th>总 tokens</th><th>每轮均值</th><th>cost $</th></tr></thead>
+                <tbody id="ctx-daily"></tbody>
+            </table>
+            <h3>阈值（config.yaml <code>context_meter</code> 段）</h3>
+            <pre class="preview-box" id="ctx-thresholds"></pre>
         </section>
 
         <!-- 状态 -->

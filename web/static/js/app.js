@@ -21,6 +21,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
         if (page === 'memory') loadMemory();
         if (page === 'files') loadFiles();
         if (page === 'behavior') loadBehavior();
+        if (page === 'context') loadContext();
         if (page === 'status') loadStatus();
         if (page === 'active') loadActive();
         if (page === 'life') loadLife();
@@ -755,6 +756,65 @@ async function reflectNow() {
     } catch (e) { showToast('反思试跑失败'); }
 }
 
+// ============ 上下文开销（P0 计量，只读数不裁剪） ============
+async function loadContext() {
+    try {
+        const s = await (await fetch('/api/context/stats')).json();
+        renderCtxPage(s);
+        ctxBanner(s);
+    } catch (e) { showToast('加载上下文开销失败'); }
+}
+
+function renderCtxPage(s) {
+    const last = s.latest_compiled || {};
+    const cards = [
+        ['模式', s.mode, s.enabled ? 'P0 只读数不裁剪' : '未启用'],
+        ['usage 事件', s.totals.usage_events, '实测 tokens/cost 采样'],
+        ['拼装事件', s.totals.compiled_events, 'context.compiled（系统 vs 历史）'],
+        ['系统恒量', fmtK(last.system_chars), '恒文+宿主 prompt（字符）'],
+        ['历史滚雪球', fmtK(last.history_chars), '最近一次 compiled 的历史字符'],
+        ['工具/消息', (last.tools_n ?? '-') + ' 工具 / ' + (last.n_messages ?? '-') + ' 条', 'latest compiled'],
+    ];
+    document.getElementById('ctx-cards').innerHTML = cards.map(([k, v, sub]) => `
+        <div class="status-card"><h3>${k}</h3>
+            <div class="status-big">${v}</div><div class="status-sub">${sub}</div>
+        </div>`).join('');
+    const wb = document.getElementById('ctx-warns');
+    if (!s.warns || !s.warns.length) {
+        wb.innerHTML = '<div class="ctx-ok">无超阈告警（观察中）</div>';
+    } else {
+        wb.innerHTML = s.warns.map(w =>
+            `<div class="ctx-warn"><b>黄条</b> ${escapeHtml(w.msg)}</div>`).join('');
+    }
+    document.getElementById('ctx-latest').innerHTML = (s.latest_turns || []).map(e =>
+        `<tr><td>${(e.ts || '').toString().slice(0, 19).replace('T', ' ')}</td><td>${escapeHtml(e.model || '')}</td>` +
+        `<td>${fmtN(e.input)}</td><td>${fmtN(e.cacheRead)}</td><td>${fmtN(e.output)}</td>` +
+        `<td>${fmtN(e.total)}</td><td>${e.cost != null ? Number(e.cost).toFixed(5) : '-'}</td></tr>`).join('');
+    document.getElementById('ctx-compiled').textContent =
+        (last && Object.keys(last).length) ? JSON.stringify(last, null, 1) : '（尚无 compiled 数据）';
+    document.getElementById('ctx-daily').innerHTML = (s.daily || []).map(d =>
+        `<tr><td>${d.day}</td><td>${d.turns}</td><td>${fmtN(d.input)}</td><td>${fmtN(d.cacheRead)}</td>` +
+        `<td>${fmtN(d.output)}</td><td>${fmtN(d.total)}</td><td>${fmtN(d.avg_turn)}</td><td>${Number(d.cost).toFixed(4)}</td></tr>`).join('');
+    document.getElementById('ctx-thresholds').textContent =
+        JSON.stringify(s.thresholds || {}, null, 1);
+}
+
+function ctxBanner(s) {
+    const b = document.getElementById('ctx-banner');
+    if (!b) return;
+    const w = (s.warns || []);
+    if (w.length) {
+        b.style.display = 'block';
+        b.className = 'ctx-banner warn';
+        b.innerHTML = '📏 上下文开销告警：' + w.map(x => escapeHtml(x.msg)).join('；') + '　<a href="#" onclick="document.querySelector(\'[data-page=context]\').click();return false;">看账本 →</a>';
+    } else {
+        b.style.display = 'none';
+    }
+}
+
+function fmtK(n) { return n == null ? '-' : (Number(n) / 1000).toFixed(1) + 'k'; }
+function fmtN(n) { return n == null ? '-' : Number(n).toLocaleString(); }
+
 // ============ 工具 ============
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({
@@ -774,4 +834,10 @@ function showToast(message) {
 document.addEventListener('DOMContentLoaded', () => {
     loadPersonality();
     loadStatus();
+    // 上下文开销黄条：加载时 + 每 60s 自动刷新（P0 只读数）
+    const refreshBanner = async () => {
+        try { ctxBanner(await (await fetch('/api/context/stats')).json()); } catch (e) {}
+    };
+    refreshBanner();
+    setInterval(refreshBanner, 60000);
 });

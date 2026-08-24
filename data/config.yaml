@@ -43,6 +43,24 @@ inject_channels:                # 注入通道总控 10 开关（爱语 KEY_INJE
   relation:    {enabled: true,  provider: openclaw}   # 羁绊/依恋线索（OpenClaw 侧执行）
   perception:  {enabled: false, provider: none}       # 感知注记: none=零成本 note / vision=多模态描述
   search:      {enabled: true,  provider: openclaw}   # 记忆检索闸（镜像 OpenClaw QMD，契约型）
+context_meter:                  # 每轮上下文开销计量＋黄条（P0 只读数不裁剪）
+  enabled: true
+  mode: meter                    # meter（只观察）| trim（P1 裁剪，暂不实现）
+  sessions_dir: ''               # 空 = ~/.openclaw/agents/girl/sessions
+  warn_turn_total_tokens: 40000  # 单轮总输入超此值黄条
+  warn_growth_days: 3            # 滚雪球对比窗口（天；08-20→08-22 每轮均值 52k→67k）
+  warn_growth_pct: 25            # 窗口内每轮均值涨幅超 % 黄条
+  warn_daily_cost_usd: 1.0       # 单日开销超此黄条
+  proxy_port: 18781              # 透明网关端口（python -m web.context_proxy）
+  clean:                         # 清洗器（P1 第一刀：心跳空轮折叠，爱语「上下文清洗」本地落地）
+    enabled: false               # false=完全不参与；开了也先走 dry_run
+    dry_run: true                # true=只算 would_clean 账不改请求（P0 铁律默认）
+    keep_recent_rounds: 1        # 连续心跳空轮最多保留最近几轮
+  upstreams:                     # 模型 → 上游（网关按此转发，请求原样透传）
+    'deepseek/deepseek-chat': 'https://api.deepseek.com'
+    'deepseek/deepseek-v4-flash': 'https://api.deepseek.com'
+    'deepseek/deepseek-reasoner': 'https://api.deepseek.com'
+    'mimo/mimo-v2.5-pro': 'https://token-plan-cn.xiaomimimo.com/v1'
 wechat:
   protocol_version: v3
   auto_accept_friend: false

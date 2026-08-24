@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import agent_admin, setup as setup_mod, soul_render
 from .active_bridge import register_active
+from . import context_meter
 from active import memgraph
 
 BASE = Path(__file__).resolve().parent
@@ -167,6 +168,14 @@ async def set_setup(payload: dict):
     """保存并重写 IDENTITY.md / USER.md（下条消息生效）。"""
     saved = setup_mod.save(BEHAVIOR_YAML, payload)
     return {"success": True, **saved}
+
+
+# ============ 上下文开销计量（P0 只读） ============
+
+@app.get("/api/context/stats")
+async def context_stats():
+    """每轮上下文开销计量 + 黄条判据。只读 OpenClaw 日志 + 自身的计费事件，不动 live 路径。"""
+    return context_meter.build_stats()
 
 
 # ============ 状态 ============

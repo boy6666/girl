@@ -29,6 +29,10 @@ data/state.json
 data/life_journal.md
 data/life_content.yaml
 
+# 上下文开销计量（P0 观察日志/增量状态，本地运行态，不入库）
+data/context_stats*.jsonl
+data/context_meter_state.json
+
 # 第三方情绪标注数据集（EmoTag / Emoji Sentiment Ranking，本地自用，不入库）
 data/emoji/
 

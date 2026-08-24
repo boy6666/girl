@@ -136,6 +136,25 @@ code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px;
 .status-big { font-size: 1.2rem; font-weight: bold; color: var(--primary); word-break: break-all; }
 .status-sub { margin-top: 8px; font-size: .8rem; color: var(--text-muted); word-break: break-all; }
 
+/* 上下文开销（P0 计量） */
+.ctx-banner {
+    margin-bottom: 18px; padding: 12px 16px; border-radius: 10px;
+    font-size: .95rem;
+}
+.ctx-banner.warn {
+    background: rgba(255, 180, 60, .15); border: 1px solid #ffb43c;
+    color: #ffd089;
+}
+.ctx-banner a { color: #ffd089; text-decoration: underline; }
+.ctx-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.ctx-warns { margin-bottom: 16px; }
+.ctx-warn { background: rgba(255, 100, 80, .12); border: 1px solid #ff6448; color: #ff9c8a; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; font-size: .92rem; }
+.ctx-ok { background: rgba(80, 220, 140, .12); border: 1px solid #50dc8c; color: #7fe0b0; padding: 10px 14px; border-radius: 8px; font-size: .92rem; }
+.ctx-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; max-width: 980px; }
+.ctx-table th, .ctx-table td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: right; font-size: .85rem; }
+.ctx-table th { color: var(--text-muted); text-transform: uppercase; }
+.ctx-table td:first-child, .ctx-table th:first-child { text-align: left; }
+
 /* Toast */
 .toast {
     position: fixed; bottom: 20px; right: 20px; padding: 12px 24px;
