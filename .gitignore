@@ -1,0 +1,24 @@
+# ── 运行态与私人数据：绝不入库 ──
+data/
+*.log
+.env
+.env.*
+*.local.json
+girl_workspace/memory/*
+!girl_workspace/memory/.gitkeep
+
+# ── Python（M2 起加入）──
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# ── 临时文件禁入仓库根目录（老仓库 340 个 tmp_* 的教训）──
+tmp_*
+*_b64.txt
+
+# ── 系统/编辑器 ──
+.DS_Store
+Thumbs.db
+desktop.ini
+node_modules/
