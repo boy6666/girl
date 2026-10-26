@@ -1,16 +1,9 @@
 {
   "plugins": {
-    "allow": [
-      "deepseek",
-      "napcat"
-    ],
+    "allow": ["deepseek", "napcat"],
     "entries": {
-      "deepseek": {
-        "enabled": true
-      },
-      "napcat": {
-        "enabled": true
-      }
+      "deepseek": { "enabled": true },
+      "napcat": { "enabled": true }
     }
   },
   "models": {
@@ -19,21 +12,17 @@
       "deepseek": {
         "baseUrl": "https://api.deepseek.com",
         "api": "openai-completions",
-        "apiKey": "${DEEPSEEK_API_KEY}",
+        "apiKey": "sk-PASTE_YOUR_REAL_DEEPSEEK_KEY_HERE",
         "models": [
           {
-            "id": "deepseek-v4-flash",
-            "name": "DeepSeek V4 Flash",
+            "id": "deepseek-flash",
+            "name": "DeepSeek V4.1 Flash",
             "reasoning": true,
-            "input": ["text"],
+            "input": ["text", "image"],
             "cost": { "input": 0.14, "output": 0.28, "cacheRead": 0.028, "cacheWrite": 0 },
-            "contextWindow": 1000000,
-            "maxTokens": 384000,
-            "compat": {
-              "supportsReasoningEffort": true,
-              "supportsUsageInStreaming": true,
-              "maxTokensField": "max_tokens"
-            },
+            "contextWindow": 1048576,
+            "maxTokens": 393216,
+            "compat": { "supportsReasoningEffort": true, "supportsUsageInStreaming": true, "maxTokensField": "max_tokens" },
             "api": "openai-completions"
           },
           {
@@ -42,42 +31,9 @@
             "reasoning": true,
             "input": ["text"],
             "cost": { "input": 1.74, "output": 3.48, "cacheRead": 0.145, "cacheWrite": 0 },
-            "contextWindow": 1000000,
-            "maxTokens": 384000,
-            "compat": {
-              "supportsReasoningEffort": true,
-              "supportsUsageInStreaming": true,
-              "maxTokensField": "max_tokens"
-            },
-            "api": "openai-completions"
-          },
-          {
-            "id": "deepseek-chat",
-            "name": "DeepSeek Chat",
-            "reasoning": false,
-            "input": ["text"],
-            "cost": { "input": 0.28, "output": 0.42, "cacheRead": 0.028, "cacheWrite": 0 },
-            "contextWindow": 131072,
-            "maxTokens": 8192,
-            "compat": {
-              "supportsUsageInStreaming": true,
-              "maxTokensField": "max_tokens"
-            },
-            "api": "openai-completions"
-          },
-          {
-            "id": "deepseek-reasoner",
-            "name": "DeepSeek Reasoner",
-            "reasoning": true,
-            "input": ["text"],
-            "cost": { "input": 0.28, "output": 0.42, "cacheRead": 0.028, "cacheWrite": 0 },
-            "contextWindow": 131072,
-            "maxTokens": 65536,
-            "compat": {
-              "supportsReasoningEffort": false,
-              "supportsUsageInStreaming": true,
-              "maxTokensField": "max_tokens"
-            },
+            "contextWindow": 1048576,
+            "maxTokens": 393216,
+            "compat": { "supportsReasoningEffort": true, "supportsUsageInStreaming": true, "maxTokensField": "max_tokens" },
             "api": "openai-completions"
           }
         ]
@@ -85,41 +41,31 @@
     }
   },
   "agents": {
-    "defaults": {
-      "models": {
-        "deepseek/deepseek-v4-flash": { "alias": "DeepSeek" },
-        "deepseek/deepseek-chat": {}
+    "ownership": "explicit",
+    "entries": {
+      "main": {
+        "name": "main",
+        "workspace": "C:\\Users\\<你的用户名>\\.openclaw\\workspace",
+        "agentDir": "C:\\Users\\<你的用户名>\\.openclaw\\agents\\main\\agent",
+        "identity": { "name": "main" }
       },
-      "model": {
-        "primary": "deepseek/deepseek-v4-flash",
-        "fallbacks": [
-          "deepseek/deepseek-chat"
-        ]
-      },
-      "memorySearch": {
-        "sources": ["memory", "sessions"],
-        "query": {
-          "maxResults": 6,
-          "minScore": 0.35
-        }
+      "default": {
+        "name": "girl",
+        "workspace": "D:\\girl-data\\workspace",
+        "agentDir": "C:\\Users\\<你的用户名>\\.openclaw\\agents\\default\\agent",
+        "identity": { "name": "girl" }
       }
     },
-    "list": [
-      {
-        "id": "girl",
-        "name": "girl",
-        "workspace": "D:\\girl-rebuilt\\girl_workspace"
-      }
-    ]
-  },
-  "bindings": [
-    {
-      "type": "route",
-      "agentId": "girl",
-      "match": {
-        "channel": "napcat"
+    "defaults": {
+      "workspace": "C:\\Users\\<你的用户名>\\.openclaw\\workspace",
+      "model": {
+        "primary": "deepseek/deepseek-flash",
+        "fallbacks": ["deepseek/deepseek-v4-pro"]
       }
     }
+  },
+  "bindings": [
+    { "agentId": "default", "match": { "channel": "napcat", "accountId": "*" } }
   ],
   "channels": {
     "napcat": {
@@ -138,9 +84,5 @@
       "token": "CHANGE_ME_TO_A_LONG_RANDOM_TOKEN"
     }
   },
-  "tools": {
-    "sessions": {
-      "visibility": "agent"
-    }
-  }
+  "tools": { "profile": "full" }
 }

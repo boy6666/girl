@@ -1,42 +1,53 @@
-# DEPLOY — Windows 10 服务器部署手册（M0）
+# DEPLOY — Windows 10 服务器部署手册（实战版）
 
-> 目标：OpenClaw（girl agent + DeepSeek）+ NapCat（QQ 个人号通道）在 Windows 10 上常驻运行。
-> 本机只是写代码的机器——照着本文在服务器上做即可。
-> 下文以 `D:\girl-rebuilt` 为仓库根目录，路径不同就改对应配置值。
+> 2026-10-25 全流程实战通过。版本基线：**OpenClaw 2026.10.7** + NapCat.Shell + DeepSeek。
+> 遇到任何报错先查 **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**——今天踩的坑全在那里。
+> 下文以 `D:\girl-rebuilt` 为仓库根目录、`D:\girl-data` 为数据目录，路径不同就改对应值。
 
 ---
 
-## 0. 前置
+## 0. 部署形态（先读，决定了后面所有步骤）
+
+**仓库 = 代码 + 模板。运行态全部在仓库外**，这是服务器 `git pull` 永不冲突的保证：
+
+| 东西 | 位置 | 进 git？ |
+|---|---|---|
+| 代码 + 配置模板 + 人格模板 | `D:\girl-rebuilt`（本仓库） | ✅ |
+| **live 网关配置** | `%USERPROFILE%\.openclaw\openclaw.json` | ❌ 本来就在仓库外 |
+| **她的工作区（人格实例 + 记忆 + 会话）** | `D:\girl-data\workspace`（首次部署从仓库 `girl_workspace` 复制） | ❌ 运行态 |
+
+**agent 命名铁律**：napcat 插件把 `agent:default` **硬编码**进会话键（源码 `inbound.js` 三处，不读任何配置）。
+所以 OpenClaw 里**必须存在 id 叫 `default` 的 agent**（identity/name 可以叫 girl），workspace 指向数据目录。
+另：agentDir 下的数据库盖了归属章，**agentDir 与 agent id 一一对应**，不能张冠李戴。
+
+## 1. 前置
 
 - Windows 10 x64，管理员 PowerShell
-- [Node.js 24 LTS](https://nodejs.org/)（`node -v` ≥ 24，含 npm）
-- Git
-- [DeepSeek 开放平台](https://platform.deepseek.com/) 的 API Key
-- **一个当"小语"的 QQ 小号**（给 NapCat 登录）+ 你自己的主 QQ 号
+- Node.js ≥ 24.15（`node -v`）
+- Git、[DeepSeek API key](https://platform.deepseek.com/)
+- **一个当"小语"的 QQ 小号** + 你的主号（小号先加主号好友）
 
-## 1. 安装 OpenClaw
+## 2. 安装 OpenClaw
 
 ```powershell
-npm install -g openclaw@2026.7.1-2
-openclaw --version          # 应输出 2026.7.1-2
+npm install -g openclaw
+openclaw --version
 ```
 
-> 版本**固定在 2026.7.1-2**（旧项目验证过的版本）。升级前先重测通道插件兼容性。
+> 2026.10.x 的子命令是 `openclaw gateway install/start/stop/status`（旧版的 `daemon` 已换名）。
 
-## 2. 取得本仓库
+## 3. 取仓库 + 建数据目录
 
 ```powershell
 cd D:\
-git clone <你的仓库地址> girl-rebuilt    # 或直接把目录拷过去
+git clone -b rebuilt <你的仓库地址> girl-rebuilt
+mkdir D:\girl-data -Force
+Copy-Item -Recurse D:\girl-rebuilt\girl_workspace D:\girl-data\workspace
 ```
 
-## 3. 写入配置与密钥
+## 4. 写配置
 
 ```powershell
-# 环境变量（重开终端后生效）
-setx DEEPSEEK_API_KEY "sk-你的key"
-
-# 配置文件
 mkdir "$env:USERPROFILE\.openclaw" -Force
 copy D:\girl-rebuilt\deploy\openclaw.example.json "$env:USERPROFILE\.openclaw\openclaw.json"
 notepad "$env:USERPROFILE\.openclaw\openclaw.json"
@@ -44,76 +55,82 @@ notepad "$env:USERPROFILE\.openclaw\openclaw.json"
 
 **必改 5 处**：
 
-| 位置 | 改成 |
+| 位置 | 值 |
 |---|---|
-| `agents.list[0].workspace` | 服务器上的仓库工作区，如 `D:\\girl-rebuilt\\girl_workspace` |
-| `channels.napcat.accessToken` | 自己生成一串随机 token（下一步 NapCat 用**同一个**） |
-| `channels.napcat.admins` | `[你的主QQ号]`（数字，不带引号） |
-| `gateway.auth.token` | 换成一串长随机 token（`openclaw daemon` 与后台通信用） |
-| `models.providers.deepseek.apiKey` | 保持 `${DEEPSEEK_API_KEY}` 不动（走环境变量） |
+| `agents.entries.default.workspace` | `D:\\girl-data\\workspace`（注意双反斜杠） |
+| `models.providers.deepseek.apiKey` | **直接内联真实 key**（S4U 服务吃不到用户级环境变量，详见 TROUBLESHOOTING §2） |
+| `channels.napcat.accessToken` | 自拟随机串（NapCat 侧要用**同一个**） |
+| `channels.napcat.admins` | `[你的主号QQ号]` |
+| `gateway.auth.token` | 长随机串 |
 
-## 4. 安装 QQ 通道插件
-
-两个可选社区插件（选一个，以它的 README 为准）：
-
-- [Daiyimo/openclaw-napcat](https://github.com/Daiyimo/openclaw-napcat) —— OneBot v11，正向 WS / 反向 WS / HTTP 三通道互备。本配置模板按它的键名写（`reverseWsPort` / `httpUrl` / `accessToken` / `admins`）。
-- [ProperSAMA/openclaw-napcat-plugin](https://github.com/ProperSAMA/openclaw-napcat-plugin) —— 同类备选。
-
-安装方式二选一：
+模型 ID 以实测目录为准，部署前核对一次（模型会改名，这是真踩过的坑）：
 
 ```powershell
-# 方式一：clone 后本地安装
+curl.exe -s https://api.deepseek.com/models -H "Authorization: Bearer 你的key"
+```
+
+最后**必须校验干净**：
+
+```powershell
+openclaw config validate
+```
+
+## 5. 装 QQ 通道插件（napcat，源码安装）
+
+```powershell
 git clone https://github.com/Daiyimo/openclaw-napcat D:\openclaw-napcat
+cd D:\openclaw-napcat
+npm install
+npm run build
 openclaw plugins install D:\openclaw-napcat
-
-# 方式二：openclaw.json 的 plugins.load.paths 指向插件目录
-#   "plugins": { "load": { "paths": ["D:\\openclaw-napcat"] } }
-#   （旧项目 send-feed 插件即此法，已验证可行）
+openclaw plugins list | Select-String napcat
 ```
 
-> 插件 id 叫 `napcat` 时，本模板的 `channels.napcat` / `plugins.allow` 键名直接可用；
-> 若插件 id 不同（如 `openclaw-napcat`），把这两处键名同步替换。
+> 插件 manifest id 是 `napcat`——openclaw.json 的 `channels.napcat` / `plugins.allow` / `bindings` 键名与它对应。
+> ClawHub 市场上的 TS-only 包目前装不上（缺编译产物），别浪费时间。
 
-## 5. NapCat 侧（Windows 原生）
+## 6. NapCat 侧
 
-1. 服务器上安装 **QQ NT 客户端** + 下载 [NapCat.Shell](https://github.com/NapNeko/NapCatQQ/releases)（解压即用，跟随其 README 启动）。
-2. 用**小号**扫码登录；NapCat 自带 WebUI（默认 `http://127.0.0.1:6099/webui`，首次 token 见启动日志）。
-3. 在 WebUI「网络配置」里新建 OneBot11 配置：
-   - **HTTP Server**：开启，端口 `3000`，token = 上一步的 accessToken，`messagePostFormat: array`
-   - **反向 WebSocket Client**：`ws://127.0.0.1:3002`，同一个 token，`reconnectInterval: 5000`
-4. NapCat 常驻：用其自带的无头/守护方式，或加一条开机计划任务，保证重启后自动登录。
+1. 装 [NapCat.Shell.Windows.OneKey](https://github.com/NapNeko/NapCatQQ/releases)（或 QQ NT + NapCat.Shell，Win10 用 `launcher-win10.bat`）。
+2. **用小号扫码登录**。以后小号的电脑端登录固定在这台服务器（两个电脑端会互踢），手机保持在线。
+3. WebUI → 网络配置 → OneBot11，**两条**：
+   - **HTTP Server**：`127.0.0.1:3000`，token = accessToken，消息格式 `array` ——这是**发送腿**，不开她回不了话
+   - **反向 WebSocket 客户端**：URL **`ws://127.0.0.1:3002`**（默认占位是 8082，必须改），同 token，重连 5000ms
+   - CORS 不开、SSL 不开、正向 WS 不开（全在本机回环，开了纯增加故障点）
+4. NapCat 设开机自启（自带守护方式或计划任务）。
 
-> NapCat 与 OpenClaw 在同一台机器上，全程只走 `127.0.0.1`，不需要对公网开任何端口。
-
-## 6. 启动 OpenClaw 网关
+## 7. 启动与验收
 
 ```powershell
-openclaw daemon install    # 装成系统服务（Windows 计划任务）
-openclaw daemon start
-openclaw daemon status     # 服务状态 + 网关连通性
+openclaw gateway install
+openclaw gateway start
+openclaw gateway status        # 等满 60 秒再看：无 Config warnings、Connectivity ok
+openclaw agents list --bindings  # 确认 default(girl) 带 napcat accountId=* 规则
 ```
 
-## 7. 验收（M0 的完成标准）
+**验收 = 真实消息**：主号私聊小号 → 她用中文、带性格地回复（第一句可能记得之前的测试消息，正常）。
+`channels status --probe` 对 napcat 超时是**已知噪音**（NapCat status 接口的问题），不影响收发，别被带偏。
 
-1. `openclaw channels status --probe` —— napcat 通道在线
-2. 用**主号**给**小号**发一条消息 → 小语用中文、有性格地回复
-3. 连续聊 10 条：不机械、不 AI 腔、一条消息不换行
-4. **重启服务器**，再发一条 —— 网关与 NapCat 都自启、她还在
-5. 第二天再聊 —— 还记得昨天聊过什么（进入 M1 验收）
+重启服务器后再发一条——网关与 NapCat 都自启、她还在，部署才算稳。
 
-## 8. 常见问题
+## 8. 日常更新（git pull 永不冲突的原理）
 
-| 症状 | 处置 |
-|---|---|
-| 通道不自启/不响应 | openclaw 2026.7.x 的 crash-loop breaker 会抑制反复失败的通道：修好 NapCat 后手动 `openclaw channels start napcat` |
-| NapCat 反复 401/重连 | 两边 token 不一致；`accessToken` 必须与 NapCat OneBot 配置完全相同 |
-| 她回 "The user is asking…" 英文旁白 | AGENTS.md 的语言铁律没被读进 system——检查 `agents.list[0].workspace` 路径是否指对 |
-| 扫码登录过期 | NapCat WebUI 重新扫码；QQ 小号建议挂常亮设备避免风控下线 |
-| 查日志 | `~/.openclaw/logs/`；NapCat 侧看 WebUI 日志页 |
-| 想加回 qmd 深度检索 | M1 再说：装 qmd 后在 openclaw.json 加 `memory.backend: qmd`（参考旧项目配置） |
+```powershell
+cd D:\girl-rebuilt
+git pull origin rebuilt
+```
 
-## 9. M2 预告（启用主动心跳时要动的地方）
+- 仓库里只有代码和模板 → pull 不会撞上任何运行态。
+- 若模板有更新（`girl_workspace/` 下），手动把差异同步到 `D:\girl-data\workspace`（先 diff 再拷，别整目录覆盖她的记忆）。
+- **铁律：永远不要在服务器上直接改仓库内文件**；live 配置改 `~\.openclaw\openclaw.json`，人格/记忆改 `D:\girl-data\workspace`。
 
-- `openclaw.json`：`agents.list[0]` 加 `heartbeat` 块（every/activeHours/prompt，照旧项目收编）
-- `plugins.load.paths` 加 `D:\girl-rebuilt\plugins\send-feed`，并设环境变量 `GIRL_SEND_FEED_PATH`
-- 服务器建计划任务：每 15 分钟跑 `python -m active tick`（代码在 M2 里程碑落地）
+## 9. M2 预告（启用主动心跳时）
+
+- `openclaw.json`：`agents.entries.default` 加 `heartbeat` 块（every/activeHours/prompt）
+- `plugins.load.paths` 加本仓库 `plugins\send-feed`，并设环境变量 `GIRL_SEND_FEED_PATH=D:\girl-data\workspace\memory\send_feed.md`
+- 计划任务：每 15 分钟 `python -m active tick`（代码随 M2 落地）
+
+## 10. 报错速查
+
+→ **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**：ClawHub 插件装不上、env var 不可用、模型改名漂移、
+`runtime owner was not published`、SQLite 归属章、反向 WS 8082 占位、QQ 互踢、probe 噪音、日志可读化命令……全在。
