@@ -53,7 +53,14 @@
         "name": "girl",
         "workspace": "D:\\girl-data\\workspace",
         "agentDir": "C:\\Users\\<你的用户名>\\.openclaw\\agents\\default\\agent",
-        "identity": { "name": "girl" }
+        "identity": { "name": "girl" },
+        "heartbeat": {
+          "every": "60m",
+          "target": "last",
+          "directPolicy": "allow",
+          "activeHours": { "start": "08:00", "end": "23:30" },
+          "prompt": "心跳：用 memory_search 看看你们最近的对话（搜一次就够）。距上次真实对话不足 6 小时，或者没有真实想说的（没聊完的线头、你真实的想法）→ 只回 HEARTBEAT_OK。只有静默超过 6 小时且真的有事想说，才用一两句主动找他。你是 AI，由头只来自你们真实的对话和你真实的思考，绝不编造活动或情绪。其余细节按 PROACTIVE_INTAKE.md。"
+        }
       }
     },
     "defaults": {

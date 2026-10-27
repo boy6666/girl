@@ -4,6 +4,10 @@
 > 旧项目（`E:\college_information\girl`）评审结论：方向健康，债务集中在
 > ①852 行 god module ②intake 协议 7 份复制 ③无锁非原子并发写。本路线已把这些结论吸收为工程铁律。
 
+> **范式转向（2026-10-25 拍板）**：不再"尽可能像真人"。**她是 AI，她知道、也坦诚这一点（透明型）**；
+> 成长引擎 = 和他的持续对话中发现并修正自己（诚实是修正的前提）。**生活模拟整线废弃**。
+> 自我修正按深度分级递进（手账→认知修正→行为修正→propose→select→累积人格），基础手账先行的阶梯设计已定稿，见下方 M3。
+
 ---
 
 ## M0 · 通 —— 能聊（当前里程碑）
@@ -20,36 +24,43 @@
 - 可选：`memory.backend: qmd` 深度语义检索（需在服务器装 qmd）
 **验收**：三天后她能自然提起前天的事。
 
-## M2 · 主 —— 会找你（第一个 Python 里程碑）
+## M2 · 主 —— 会找你（零 Python，纯 OpenClaw 原生心跳）
 
-**目标**：她会主动开口，且节奏克制、有真实由头。
+**目标（P0 MVP）**：长时间没聊（≥6h）→ 她主动说一句真实由头的话。
 
-| 组件 | 来源 | 形态（吸收重构结论） |
+- **机制**：`agents.entries.default.heartbeat`（every 60m / activeHours 08:00-23:30 / HEARTBEAT_OK 静默协议——纯 OK 回复被网关原生丢弃）+ `PROACTIVE_INTAKE.md` 契约（由头只来自真实对话与她的真实思考）。
+- **节奏设计**：主引擎是**对话内自然交流**（心跳不是主要说话方式）；心跳只负责"静默兜底"——沉默检查器，每天最多成功开口 2 次（P1 起用机械闸门锁死）。
+- **由头**：她用 memory_search 检索真实对话残留（没聊完的线头/她想问的/她作为 AI 的真实想法）。**不编造**。
+
+### 主动系统递进分级（按深度一点点加）
+
+| 级 | 内容 | 依赖 |
 |---|---|---|
-| `active/core/state_machine.py` | 照搬旧版（纯函数质量好，四扇卫门已拆） | energy/mood/social_need 三方程 + 开窗判定 |
-| `active/core/state_store.py` | 重写 | **原子写(tmp+replace) + 锁**；损坏告警不静默归零 |
-| `active/config.py` | 重写 | `ConfigRepo`：data/config.yaml **唯一读写口**（锁+原子写）；模板 = `config.example.yaml` |
-| `active/channels/intake.py` | 新建 | `IntakeFile` 唯一抽象（谁写/谁清/追加或覆盖显式化）——旧项目 7 份复制的教训 |
-| `active/engine/tick.py` | 收编旧 active_bridge 心跳职责 | **CLI：`python -m active tick`**，由 Windows 计划任务每 15 分钟调；**不做常驻线程、不寄生 web** |
-| `plugins/send-feed/` | 已收编（本期启用） | 机械记账 `__REPLY__`/`__SELF__`，不靠自觉 |
-| OpenClaw heartbeat | 旧配置收编 | `every: 30m` + activeHours + HEARTBEAT_OK 协议 + `PROACTIVE_INTAKE.md` |
-| 动机卡片【现在】 | 收编旧 motivation | 简化版：只讲真实由头，社科原则保留在文档 |
+| **P0 · MVP** | 静默 ≥6h → 主动一句真实由头的话；心跳 60m + activeHours 勿扰；无闸门无记账 | 配置 + 人格文件（已就绪） |
+| P1 | 频率闸门：send-feed 前缀修复（`agent:girl`→`agent:default`）+ `__SELF__` 计数 ≤2/天 | P0 验收通过 |
+| P2 | 对话内多连发（多行拆条实测 + AGENTS 连发规则） | P0 |
+| P3 | 静默阈值/时段参数化 | P1/P2 |
+| P4 | 状态机（渴望方程）若实测仍需要再上——新范式下存疑 | 全部 |
 
-**舍弃**：独立心跳线程、uvicorn 寄生、三份 tick 实现并存、`unanswered_count` 半死字段。
+**验收（P0）**：①正常聊天后 1-2h 内她不主动（静默纪律）；②留一个线头静默 ≥6h 后她捡起来（开口能力）。
 
-## M3 · 内 —— 有内心
+## M3 · 内 —— 有内心（自我修正引擎，按 L 级递进）
 
-- **反思 reflection**：`REFLECT_INTAKE.md` → `memory/reflections/YYYY-MM-DD.md`，可靠洞见升 MEMORY.md
-- **日记 diary**：`DIARY_INTAKE.md` → `memory/diary/`；固定就寝窗口起步
-- 可选后置：**作息漂移 circadian**（他晚睡我晚睡）、**梦 dream**（非每日、须真实由头）
-- 可选后置：旧 `life_journal` 的 harvest 收编（若日记可检索则**永久舍弃**——两套日志是重复）
+**范式**：她的成长 = 从手账里发现并修正自己。宪法只读（SOUL/IDENTITY/AGENTS 由他手改）、学习不授权、上下文走检索、来源可追溯——四条铁律全等级恒定。
 
-## M4 · 活 —— 有生活
+| 级 | 内容 |
+|---|---|
+| **L0 · 手账** | 每晚一篇对话账本（三分法：事实/他的观点/我的推测），纯记录零修正 |
+| L1 · 认知的修正 | 每天最多 1 条关于他/事的认知更新进 USER/MEMORY（带来源修订号） |
+| L2 · 下一次如何回应 | `SELF-RULES.md` 行为修正层上线（每天 1 条，读侧分页最近 7 条）——**引擎点火** |
+| L3 · propose→select | 修正进待定区、他扫一眼转正；每周"我改了自己什么"汇报 |
+| L4 · 累积人格层 | 稳定认知层（带修订链），她的 AI 体验可入账 |
 
-- **生活底色** `data/life_content.yaml` + **当下活动** life_sim → 动机卡片【今天】
-- **她的一天 life_day**（简化版：早上排一天 → 晚间日记对账；砍掉打断修正）
-- **成长 growth**：GROWTH.md 低频（约 3 天）追加，真长才算，没长不硬写
-- 可选：时刻表 scheduler、依恋轴（secure/anxious/avoidant 调制思念涨速）
+（dsh-bili-humanism 的六条纪律已吸收：专用累积文件/双类目合法条目/每日配额/来源留痕/读侧分离/学习不授权。）
+
+## ~~M4 · 活~~ —— 已废弃
+
+生活模拟整线（生活底色/她的一天/梦/作息漂移）随范式转向**永久舍弃**——她不假装过日子，她的生活就是和他的对话。原状态机（energy/mood/social_need）进 P4 观察位，实测确有节奏问题再以"诚实化"形态复活。
 
 ## M5 · 台 —— 可观测
 
