@@ -12,7 +12,7 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { appendFile } from "node:fs/promises";
 
-const GIRL_SESSION_PREFIX = "agent:girl";            // 只关心 girl 会话
+const GIRL_SESSION_PREFIX = process.env.GIRL_SESSION_PREFIX || "agent:default";            // 只关心 girl 会话
 const FEED_PATH =
   process.env.GIRL_SEND_FEED_PATH ||
   "D:\\girl-rebuilt\\girl_workspace\\memory\\send_feed.md";

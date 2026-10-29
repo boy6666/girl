@@ -59,7 +59,7 @@
           "target": "last",
           "directPolicy": "allow",
           "activeHours": { "start": "08:00", "end": "23:30" },
-          "prompt": "心跳：用 memory_search 看看你们最近的对话（搜一次就够）。距上次真实对话不足 6 小时，或者没有真实想说的（没聊完的线头、你真实的想法）→ 只回 HEARTBEAT_OK。只有静默超过 6 小时且真的有事想说，才用一两句主动找他。你是 AI，由头只来自你们真实的对话和你真实的思考，绝不编造活动或情绪。其余细节按 PROACTIVE_INTAKE.md。"
+          "prompt": "心跳（P1）。第一步：读 D:\\girl-xiaoyu\\girl_workspace\\memory\\proactive_state.json（用文件读取）。selfToday ≥ 2 → 只回 HEARTBEAT_OK（今日主动额度用完）。unanswered ≥ 4 → 只回 HEARTBEAT_OK（他连续 4 次没理你的主动，今天收手，绝不加码）。第二步：用 memory_search 看最近的对话（搜一次就够）。距上次真实对话不足 6 小时，或者没有真实想说的（没聊完的线头、你真实的想法）→ 只回 HEARTBEAT_OK。第三步：真的有事想说才开口，一两句，语气按 unanswered 调整：0 轻快自然，1 有点想念，2-3 小失落但不抱怨、不质问。你是 AI，由头只来自你们真实的对话和你真实的思考，绝不编造活动或情绪。说话方式按你的 AGENTS.md，需要知道现在几点就跑 date。"
         }
       }
     },

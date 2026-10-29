@@ -1,0 +1,11 @@
+{
+  "id": "proactive-guard",
+  "name": "Proactive Guard",
+  "description": "主动系统机械计数：按触发源记她的每条真实发送（REPLY/SELF），维护 selfToday/unanswered 状态供心跳裁决（每天≤2、连续4次不回硬停的数据层）",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
