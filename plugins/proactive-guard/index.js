@@ -3,8 +3,13 @@
 // 职责：把"她今天主动发了几条、他连续几次没理她的主动"记成状态文件，
 // 供心跳 prompt 裁决。退让规则在 prompt 里，数据在这里。
 //
-// 钩子：before_agent_run 抓触发源，message_sent 按触发源分类，agent_end 清刻度。
-// 本版带完整诊断日志（每个判断点都说话），定位 10.7 的钩子数据形状后可静音。
+// 10.7 实测结论（2026-10-31 诊断）：
+//   - before_agent_run / agent_end ✅ 实证会触发（带 sessionKey + trigger）
+//   - message_sent ❌ 对 napcat 通道投递不触发（10.7 改了覆盖范围）
+//   - llm_output ✅ 携带 assistantTexts（她的回复全文）+ usage
+// 所以记账改用三钩子组合：before_agent_run 抓触发源 → llm_output 暂存输出
+// → agent_end 提交（HEARTBEAT_OK 之类的静默输出不计）。
+// 本版保留全链路诊断日志，稳定后可静音。
 
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -19,7 +24,8 @@ const STATE_PATH =
 
 const REPLY = "REPLY";
 const SELF = "SELF";
-const pendingTrigger = new Map(); // sessionKey -> 本次运行的触发源
+const pendingTrigger = new Map();  // sessionKey -> 本回合触发源
+const lastOutput = new Map();      // sessionKey -> 本回合最后一次模型输出
 
 function isGirl(sessionKey) {
   return typeof sessionKey === "string" && sessionKey.startsWith(PREFIX);
@@ -29,6 +35,33 @@ function today() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function isSilence(text) {
+  // HEARTBEAT_OK（含前后空白）= 这一轮她选择沉默，不算消息
+  return /^\s*HEARTBEAT_OK\b/.test(text);
+}
+
+async function commit(sessionKey) {
+  const trigger = pendingTrigger.get(sessionKey);
+  const output = (lastOutput.get(sessionKey) || "").trim();
+  if (!output || isSilence(output)) {
+    console.log(
+      `[proactive-guard] commit: ${sessionKey} 无有效输出（静默），不记账 (trigger=${trigger ?? "?"})`
+    );
+    return;
+  }
+  const kind = trigger === "user" ? REPLY : SELF;
+  console.log(`[proactive-guard] commit: ${sessionKey} → ${kind}（${output.length} 字）`);
+  try {
+    const dir = LOG_PATH.substring(0, LOG_PATH.lastIndexOf("\\"));
+    await mkdir(dir, { recursive: true });
+    await appendFile(LOG_PATH, `[${new Date().toISOString()}] ${kind}\n`, "utf8");
+  } catch (err) {
+    console.error("[proactive-guard] 日志写入失败:", err && err.message);
+    return;
+  }
+  await recompute();
 }
 
 async function recompute() {
@@ -72,7 +105,7 @@ export default definePluginEntry({
   id: "proactive-guard",
   name: "Proactive Guard",
   description:
-    "主动系统机械计数：按触发源记她的每条真实发送（REPLY/SELF），维护 selfToday/unanswered 状态供心跳裁决",
+    "主动系统机械计数：before_agent_run/llm_output/agent_end 三钩子组合，维护 selfToday/unanswered 状态供心跳裁决",
   register(api) {
     const opts = { priority: 50 };
     console.log(
@@ -83,42 +116,31 @@ export default definePluginEntry({
       console.log(
         `[proactive-guard] before_agent_run: session=${ctx?.sessionKey} trigger=${ctx?.trigger}`
       );
-      if (ctx && ctx.sessionKey && ctx.trigger) {
+      if (ctx && ctx.sessionKey) {
         pendingTrigger.set(ctx.sessionKey, ctx.trigger);
+        lastOutput.delete(ctx.sessionKey);
       }
     }, opts);
 
-    api.on("message_sent", async (event, ctx) => {
-      console.log(
-        `[proactive-guard] message_sent 触发: session=${ctx?.sessionKey} success=${event?.success} ` +
-        `eventKeys=[${event ? Object.keys(event).join(",") : "(无)"}] ` +
-        `ctxKeys=[${ctx ? Object.keys(ctx).join(",") : "(无)"}]`
-      );
-      if (!ctx || !isGirl(ctx.sessionKey)) {
-        console.log("[proactive-guard] 跳过：不是 girl 会话");
-        return;
+    api.on("llm_output", (event, ctx) => {
+      if (!ctx || !isGirl(ctx.sessionKey)) return;
+      const texts = (event?.assistantTexts || []).join(" ").trim();
+      if (texts) {
+        lastOutput.set(ctx.sessionKey, texts);
+        console.log(
+          `[proactive-guard] llm_output: session=${ctx?.sessionKey} 收到输出 ${texts.length} 字（暂存，等 agent_end 提交）`
+        );
       }
-      if (!event || !event.success) {
-        console.log("[proactive-guard] 跳过：success 非 true");
-        return;
-      }
-      const trigger = pendingTrigger.get(ctx.sessionKey);
-      const kind = trigger === "user" ? REPLY : SELF;
-      console.log(`[proactive-guard] 记录: ${kind} (trigger=${trigger ?? "未知→按SELF"})`);
-      try {
-        const dir = LOG_PATH.substring(0, LOG_PATH.lastIndexOf("\\"));
-        await mkdir(dir, { recursive: true });
-        await appendFile(LOG_PATH, `[${new Date().toISOString()}] ${kind}\n`, "utf8");
-      } catch (err) {
-        console.error("[proactive-guard] 日志写入失败:", err && err.message);
-        return;
-      }
-      await recompute();
     }, opts);
 
-    api.on("agent_end", (event, ctx) => {
-      console.log(`[proactive-guard] agent_end: session=${ctx?.sessionKey}`);
-      if (ctx && ctx.sessionKey) pendingTrigger.delete(ctx.sessionKey);
+    api.on("agent_end", async (event, ctx) => {
+      const sk = ctx?.sessionKey;
+      console.log(`[proactive-guard] agent_end: session=${sk}`);
+      if (sk && isGirl(sk)) {
+        await commit(sk);
+      }
+      pendingTrigger.delete(sk);
+      lastOutput.delete(sk);
     }, opts);
   },
 });
