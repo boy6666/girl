@@ -1,15 +1,13 @@
-// proactive-guard 插件：主动系统的机械计数器（P1 主菜的数据层）。
+// proactive-guard v0.3：主动系统的机械计数器（P1 数据层）。
 //
-// 职责：把"她今天主动发了几条、他连续几次没理她的主动"记成状态文件，
-// 供心跳 prompt 裁决。退让规则在 prompt 里，数据在这里。
+// 10.7 实测结论（2026-10-31）：
+//   - before_agent_run ✅（带 sessionKey + trigger）
+//   - llm_output ✅（带 runId + assistantTexts 回复全文 + usage）
+//   - message_sent ❌ 对 napcat 通道投递不触发
+//   - agent_end 先于最后一轮 llm_output 派发 → 提交动作必须挂在 llm_output 上
 //
-// 10.7 实测结论（2026-10-31 诊断）：
-//   - before_agent_run / agent_end ✅ 实证会触发（带 sessionKey + trigger）
-//   - message_sent ❌ 对 napcat 通道投递不触发（10.7 改了覆盖范围）
-//   - llm_output ✅ 携带 assistantTexts（她的回复全文）+ usage
-// 所以记账改用三钩子组合：before_agent_run 抓触发源 → llm_output 暂存输出
-// → agent_end 提交（HEARTBEAT_OK 之类的静默输出不计）。
-// 本版保留全链路诊断日志，稳定后可静音。
+// 记账规则：llm_output 到达且输出非静默（非 HEARTBEAT_OK）→ 立即按触发源分类记账，
+// 同一回合（runId）只记一次。状态文件供心跳 prompt 裁决（每天≤2、连续4次不回硬停）。
 
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -24,8 +22,8 @@ const STATE_PATH =
 
 const REPLY = "REPLY";
 const SELF = "SELF";
-const pendingTrigger = new Map();  // sessionKey -> 本回合触发源
-const lastOutput = new Map();      // sessionKey -> 本回合最后一次模型输出
+const pendingTrigger = new Map();   // sessionKey -> 本回合触发源
+const lastCommittedRun = new Map(); // sessionKey -> 已记账的 runId（回合内去重）
 
 function isGirl(sessionKey) {
   return typeof sessionKey === "string" && sessionKey.startsWith(PREFIX);
@@ -42,35 +40,13 @@ function isSilence(text) {
   return /^\s*HEARTBEAT_OK\b/.test(text);
 }
 
-async function commit(sessionKey) {
-  const trigger = pendingTrigger.get(sessionKey);
-  const output = (lastOutput.get(sessionKey) || "").trim();
-  if (!output || isSilence(output)) {
-    console.log(
-      `[proactive-guard] commit: ${sessionKey} 无有效输出（静默），不记账 (trigger=${trigger ?? "?"})`
-    );
-    return;
-  }
-  const kind = trigger === "user" ? REPLY : SELF;
-  console.log(`[proactive-guard] commit: ${sessionKey} → ${kind}（${output.length} 字）`);
-  try {
-    const dir = LOG_PATH.substring(0, LOG_PATH.lastIndexOf("\\"));
-    await mkdir(dir, { recursive: true });
-    await appendFile(LOG_PATH, `[${new Date().toISOString()}] ${kind}\n`, "utf8");
-  } catch (err) {
-    console.error("[proactive-guard] 日志写入失败:", err && err.message);
-    return;
-  }
-  await recompute();
-}
-
 async function recompute() {
   let lines = [];
   try {
     const text = await readFile(LOG_PATH, "utf8");
     lines = text.split("\n");
   } catch {
-    console.log("[proactive-guard] recompute: 日志不存在，跳过");
+    console.log("[proactive-guard] recompute: log file missing, skip");
     return;
   }
   const marks = [];
@@ -95,17 +71,29 @@ async function recompute() {
   };
   try {
     await writeFile(STATE_PATH, JSON.stringify(state, null, 2), "utf8");
-    console.log(`[proactive-guard] 状态已更新: ${JSON.stringify(state)}`);
+    console.log(`[proactive-guard] state updated: selfToday=${selfToday} unanswered=${unanswered}`);
   } catch (err) {
-    console.error("[proactive-guard] 状态写入失败:", err && err.message);
+    console.error("[proactive-guard] state write failed:", err && err.message);
   }
+}
+
+async function record(kind) {
+  try {
+    const dir = LOG_PATH.substring(0, LOG_PATH.lastIndexOf("\\"));
+    await mkdir(dir, { recursive: true });
+    await appendFile(LOG_PATH, `[${new Date().toISOString()}] ${kind}\n`, "utf8");
+  } catch (err) {
+    console.error("[proactive-guard] log write failed:", err && err.message);
+    return;
+  }
+  await recompute();
 }
 
 export default definePluginEntry({
   id: "proactive-guard",
   name: "Proactive Guard",
   description:
-    "主动系统机械计数：before_agent_run/llm_output/agent_end 三钩子组合，维护 selfToday/unanswered 状态供心跳裁决",
+    "主动系统机械计数：llm_output 到达即按触发源分类记账（runId 去重），维护 selfToday/unanswered 状态供心跳裁决",
   register(api) {
     const opts = { priority: 50 };
     console.log(
@@ -113,34 +101,38 @@ export default definePluginEntry({
     );
 
     api.on("before_agent_run", (event, ctx) => {
-      console.log(
-        `[proactive-guard] before_agent_run: session=${ctx?.sessionKey} trigger=${ctx?.trigger}`
-      );
+      console.log(`[proactive-guard] before_agent_run: session=${ctx?.sessionKey} trigger=${ctx?.trigger}`);
       if (ctx && ctx.sessionKey) {
         pendingTrigger.set(ctx.sessionKey, ctx.trigger);
-        lastOutput.delete(ctx.sessionKey);
       }
     }, opts);
 
     api.on("llm_output", (event, ctx) => {
       if (!ctx || !isGirl(ctx.sessionKey)) return;
-      const texts = (event?.assistantTexts || []).join(" ").trim();
-      if (texts) {
-        lastOutput.set(ctx.sessionKey, texts);
-        console.log(
-          `[proactive-guard] llm_output: session=${ctx?.sessionKey} 收到输出 ${texts.length} 字（暂存，等 agent_end 提交）`
-        );
+      const runId = event?.runId || "";
+      const output = (event?.assistantTexts || []).join(" ").trim();
+      if (!output || isSilence(output)) {
+        console.log(`[proactive-guard] llm_output: silence (${output.length} chars), skip`);
+        return;
       }
+      if (runId && lastCommittedRun.get(ctx.sessionKey) === runId) {
+        console.log(`[proactive-guard] llm_output: run ${runId.slice(0, 8)} already committed, skip`);
+        return;
+      }
+      if (runId) lastCommittedRun.set(ctx.sessionKey, runId);
+      const trigger = pendingTrigger.get(ctx.sessionKey);
+      const kind = trigger === "user" ? REPLY : SELF;
+      console.log(
+        `[proactive-guard] commit: ${kind} ${output.length} chars (trigger=${trigger ?? "?"}, runId=${runId.slice(0, 8)})`
+      );
+      record(kind).catch((err) =>
+        console.error("[proactive-guard] record failed:", err && err.message)
+      );
     }, opts);
 
-    api.on("agent_end", async (event, ctx) => {
-      const sk = ctx?.sessionKey;
-      console.log(`[proactive-guard] agent_end: session=${sk}`);
-      if (sk && isGirl(sk)) {
-        await commit(sk);
-      }
-      pendingTrigger.delete(sk);
-      lastOutput.delete(sk);
+    api.on("agent_end", (event, ctx) => {
+      console.log(`[proactive-guard] agent_end: session=${ctx?.sessionKey}`);
+      if (ctx && ctx.sessionKey) pendingTrigger.delete(ctx.sessionKey);
     }, opts);
   },
 });
